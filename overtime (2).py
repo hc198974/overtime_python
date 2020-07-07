@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 import calendar
 import datetime
-import json
-import time
 import tkinter
 import tkinter.simpledialog
 from itertools import combinations
@@ -169,6 +167,7 @@ class Count(object):
     # 调整工程科表里的加班小时数
     def change_hour(self):
         temp17 = datetime.datetime.strptime('17:30', "%H:%M")
+        temp18 = datetime.datetime.strptime('18:00','%H:%M')
         temp12 = datetime.datetime.strptime('12:00', "%H:%M")
         temp13 = datetime.datetime.strptime('13:00', "%H:%M")
         temp8 = datetime.datetime.strptime('8:00', "%H:%M")
@@ -187,7 +186,7 @@ class Count(object):
 
                             # 工作日
                             if temp in self.workday:
-                                if time2 > temp17:
+                                if time2 > temp18:
                                     self.hour = (time2-temp17).seconds
 
                             if self.hour > 0:
