@@ -13,7 +13,7 @@ from openpyxl import load_workbook
 class Crili(object):
     """
     万年日历接口数据抓取
-    Params:year 四位数年份字符串
+    Params:year 四位数年份字符串.
     """
 
     def __init__(self, year, month):
