@@ -192,6 +192,7 @@ class Count(object):
                                 x[3].value = self.hour/3600
                                 self.hour = 0
                             else:
+                                x[3].value = 0
                                 self.hour = 0
 
                             # 周末和节假日
@@ -222,6 +223,7 @@ class Count(object):
                                     x[3].value = self.hour/3600
                                     self.hour = 0
                                 else:
+                                    x[3].value = 0
                                     self.hour = 0
         self.wb.save('工程科.xlsx')
     # 获得加班小时数
@@ -291,13 +293,10 @@ class Count(object):
             s = ''
             if x[1].value == self.name:
                 if x[4].value == self.month:
-                    s = x[2].value.strftime("%Y%m%d")
-                    self.dic[s] = x[3].value
+                    if x[3].value != None and x[3].value > 0:  # 把加班时间是0和负数的日期去掉，不参与计算
+                        s = x[2].value.strftime("%Y%m%d")
+                        self.dict[s] = x[3].value
 
-        # 把加班时间是0和负数的日期去掉，不参与计算
-        for y in self.dic:
-            if self.dic[y] > 0:
-                self.dict[y] = self.dic[y]
         # 把self.holiday改回来
         holiday = {}
         weekday = {}
@@ -349,7 +348,7 @@ class Count(object):
 
 cw = Cwindow()
 cw.createwindow()
-rili = Crili(2020, cw.month)
+rili = Crili(2023, cw.month)
 result = rili.parseHTML()
 ji = Count(cw.name, cw.month, result)
 ji.jisuan()
