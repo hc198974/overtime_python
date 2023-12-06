@@ -68,7 +68,6 @@ class Crili(object):
 
 class Cwindow(object):
     def __init__(self):
-        self.name = '历侠'
         self.month = datetime.datetime.now().month - 1
 
     def set_win_center(self, root, curWidth='', curHight=''):
@@ -173,9 +172,8 @@ class Count(object):
             if x[1].value == self.name:
                 if x[4].value == self.month:
                     temp = x[2].value.strftime("%Y%m%d")
-
-                    time1 = x[8].value
-                    time2 = x[9].value
+                    time1 = x[7].value
+                    time2 = x[8].value
                     if time1 != None and time2 != None:
                         if time2 > time1:
                             time1 = datetime.datetime.strptime(time1, "%H:%M")
@@ -188,11 +186,13 @@ class Count(object):
 
                             if self.hour > 0:
                                 x[3].value = self.hour / 3600
-                                x[6].value = "工作日"
+                                s = x[2].value.strftime("%Y%m%d")
+                                self.dict[s] = x[3].value
+                                x[5].value = "工作日"
                                 self.hour = 0
                             else:
                                 x[3].value = 0
-                                x[6].value = "工作日"
+                                x[5].value = "工作日"
                                 self.hour = 0
 
                             # 周末和节假日
@@ -221,12 +221,15 @@ class Count(object):
 
                                 if self.hour > 0:
                                     x[3].value = self.hour / 3600
-                                    x[6].value = "节假日"
+                                    s = x[2].value.strftime("%Y%m%d")
+                                    self.dict[s] = x[3].value
+                                    x[5].value = "节假日"
                                     self.hour = 0
                                 else:
                                     x[3].value = 0
-                                    x[6].value = "节假日"
+                                    x[5].value = "节假日"
                                     self.hour = 0
+                                                    
         self.wb.save('工程科.xlsx')
 
     # 获得加班小时数
@@ -287,18 +290,23 @@ class Count(object):
     def dict_setcash(self, **kw):
         for x in kw:
             self.cash[x] = '转加班费'
+    
+    def set_content(self):
+        #写入是转加班费self.cash还是转串休self.dicts
+        for x in self.ws.rows:
+            if x[1].value == self.name:
+                for y in self.cash.keys():                
+                    if x[2].value.strftime("%Y%m%d") == y:
+                        x[6].value="转加班费"
+                
+                for y in self.dict.keys():                
+                    if x[2].value.strftime("%Y%m%d") == y:
+                        x[6].value="转串休"
+        self.wb.save('工程科.xlsx')
 
     def jisuan(self):
         # 获得URL
         self.change_hour()
-
-        for x in self.ws.rows:
-            s = ''
-            if x[1].value == self.name:
-                if x[4].value == self.month:
-                    if x[3].value != None and x[3].value > 0:  # 把加班时间是0和负数的日期去掉，不参与计算
-                        s = x[2].value.strftime("%Y%m%d")
-                        self.dict[s] = x[3].value
 
         # 把self.holiday改回来
         holiday = {}
@@ -347,14 +355,17 @@ class Count(object):
         for k in self.cash.keys():
             self.dict.pop(k)
         print('转串休假：', sorted(self.dict.keys()))
+        self.set_content()
 
 
 cw = Cwindow()
 cw.createwindow()
 rili = Crili(2023, cw.month)
 result = rili.parseHTML()
-names=['历侠','倪凡']
-for name in names:
-    print(name, cw.month, '月')
-    ji = Count(name, cw.month, result)
-    ji.jisuan()
+wb = load_workbook(filename='工程科.xlsx')
+ws = wb['中干']
+for row in ws.iter_rows(min_row=3,max_row=4,min_col=2,max_col=2):
+    for name in row:
+        print(name.value, cw.month, '月')
+        ji = Count(name.value, cw.month, result)
+        ji.jisuan()
