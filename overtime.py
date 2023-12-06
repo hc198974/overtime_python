@@ -40,7 +40,7 @@ class Crili(object):
 
         c = calendar.monthrange(self.year, self.month)[1]
         s = requests.session()
-        payload = {'q': str(self.year)+'-'+str(self.month)}
+        payload = {'q': str(self.year) + '-' + str(self.month)}
         response = s.get(url, headers=headers, params=payload)
         element = etree.HTML(response.text)
         html = element.xpath('//div[@class="wnrl_riqi"]')
@@ -50,26 +50,26 @@ class Crili(object):
             item = html[i].xpath('./a')[0].attrib
             if item['id'] == 'wnrl_riqi_id_' + str(i):
                 if 'class' in item:
-                    temp = datetime.datetime(self.year, self.month, i+1)
+                    temp = datetime.datetime(self.year, self.month, i + 1)
                     if item['class'] == 'wnrl_riqi_xiu':
                         weekday = 2
                     elif item['class'] == 'wnrl_riqi_mo':
                         weekday = 1
                 else:
-                    temp = datetime.datetime(self.year, self.month, i+1)
+                    temp = datetime.datetime(self.year, self.month, i + 1)
                     if temp.weekday() > 4:
                         weekday = 1
                     else:
                         weekday = 0
 
                 result[temp.strftime('%Y%m%d')] = weekday
-        return(result)
+        return (result)
 
 
 class Cwindow(object):
     def __init__(self):
-        self.name = '韩超'
-        self.month = datetime.datetime.now().month-1
+        self.name = '历侠'
+        self.month = datetime.datetime.now().month - 1
 
     def set_win_center(self, root, curWidth='', curHight=''):
         '''
@@ -104,7 +104,7 @@ class Cwindow(object):
 
     def askmonth(self):
         month = tkinter.simpledialog.askinteger(
-            title='获取月份', prompt='请输入月份', initialvalue=datetime.datetime.now().month-1)
+            title='获取月份', prompt='请输入月份', initialvalue=datetime.datetime.now().month - 1)
         self.month = month
 
     def shutdown(self):
@@ -141,7 +141,6 @@ class Count(object):
         self.ws = self.wb['汇总表']
         self.name = name
         self.month = month
-        self.dic = {}
         self.dict = {}
         self.weekday = {}
         self.workday = {}
@@ -161,7 +160,7 @@ class Count(object):
                     self.holiday[m] = 2
 
         except ConnectionResetError as e:
-            print('远程主机发生错误'+e)
+            print('远程主机发生错误' + e)
 
     # 调整工程科表里的加班小时数
     def change_hour(self):
@@ -186,13 +185,15 @@ class Count(object):
                             # 工作日
                             if temp in self.workday:
                                 if time2 > temp18:
-                                    self.hour = (time2-temp17).seconds
+                                    self.hour = (time2 - temp17).seconds
 
                             if self.hour > 0:
-                                x[3].value = self.hour/3600
+                                x[3].value = self.hour / 3600
+                                x[6].value = "工作日"
                                 self.hour = 0
                             else:
                                 x[3].value = 0
+                                x[6].value = "工作日"
                                 self.hour = 0
 
                             # 周末和节假日
@@ -209,23 +210,26 @@ class Count(object):
                                     pass
 
                                 if time2 <= temp12:
-                                    self.hour = (time2-time1 -
+                                    self.hour = (time2 - time1 -
                                                  datetime.timedelta(hours=0.5)).seconds
                                 if time2 >= temp13:
                                     if time1 <= temp12:
-                                        self.hour = (time2-time1 -
+                                        self.hour = (time2 - time1 -
                                                      datetime.timedelta(hours=1.5)).seconds
                                     else:
-                                        self.hour = (time2-time1 -
+                                        self.hour = (time2 - time1 -
                                                      datetime.timedelta(hours=0.5)).seconds
 
                                 if self.hour > 0:
-                                    x[3].value = self.hour/3600
+                                    x[3].value = self.hour / 3600
+                                    x[6].value = "节假日"
                                     self.hour = 0
                                 else:
                                     x[3].value = 0
+                                    x[6].value = "节假日"
                                     self.hour = 0
         self.wb.save('工程科.xlsx')
+
     # 获得加班小时数
 
     def get_hour(self):
@@ -234,7 +238,7 @@ class Count(object):
             for y in self.cash.keys():
                 if x[1].value == self.name:
                     if x[2].value.strftime("%Y%m%d") == y:
-                        sum4 = sum4+x[3].value
+                        sum4 = sum4 + x[3].value
         return sum4
 
     def sum_num(self, **kw):
@@ -246,13 +250,13 @@ class Count(object):
         return sum3
 
     def dict_seprate(self, target, **kw):
-        tt = range(1, len(kw)+1)
+        tt = range(1, len(kw) + 1)
         tup = []
         min1 = 36.5
         c = 0
         minlist = []
         for t in tt:
-            tup = list(combinations(tt, t))+list(tup)
+            tup = list(combinations(tt, t)) + list(tup)
 
         for x in tup:
             newtup = []
@@ -271,8 +275,8 @@ class Count(object):
                             sum1 += self.dict[n]
 
             if sum1 <= target:
-                if min1 >= target-sum1:
-                    min1 = target-sum1
+                if min1 >= target - sum1:
+                    min1 = target - sum1
                     minlist = newtup
 
         for p in minlist:
@@ -316,22 +320,22 @@ class Count(object):
         sholiday = self.sum_num(**self.holiday)
         sweekday = self.sum_num(**self.weekday)
         sworkday = self.sum_num(**self.workday)
-        sum = sholiday+sweekday+sworkday
+        sum = sholiday + sweekday + sworkday
 
         self.get_hour()
 
-        if 36.5-sholiday > 0:
+        if 36.5 - sholiday > 0:
             self.dict_setcash(**self.holiday)
-            if 36.5-sholiday-sweekday > 0:
+            if 36.5 - sholiday - sweekday > 0:
                 self.dict_setcash(**self.weekday)
-                if 36.5-sholiday-sweekday-sworkday > 0:
+                if 36.5 - sholiday - sweekday - sworkday > 0:
                     self.dict_setcash(**self.workday)
                 else:
                     # 只对workday进行拆分就行
-                    self.dict_seprate(36.5-sholiday-sweekday, **self.workday)
+                    self.dict_seprate(36.5 - sholiday - sweekday, **self.workday)
             else:
                 # 对workday和weekday同时操作
-                min = self.dict_seprate(36.5-sholiday, **self.weekday)
+                min = self.dict_seprate(36.5 - sholiday, **self.weekday)
                 min = self.dict_seprate(min, **self.workday)
         else:
             pass
@@ -339,7 +343,7 @@ class Count(object):
         print('总数据一览：', self.dict)
         print('加班数合计：', round(sum, 2))
         print('转加班小时：', round(self.get_hour(), 2))
-        print('转串休小时：', round(sum-self.get_hour(), 2))
+        print('转串休小时：', round(sum - self.get_hour(), 2))
         print("转加班费：", sorted(self.cash.keys()))
         for k in self.cash.keys():
             self.dict.pop(k)
