@@ -108,7 +108,6 @@ class Cwindow(object):
         self.month = month
 
     def shutdown(self):
-        print(self.name, self.month, '月')
         root.destroy()
 
     def createwindow(self):
@@ -354,5 +353,8 @@ cw = Cwindow()
 cw.createwindow()
 rili = Crili(2023, cw.month)
 result = rili.parseHTML()
-ji = Count(cw.name, cw.month, result)
-ji.jisuan()
+names=['历侠','倪凡']
+for name in names:
+    print(name, cw.month, '月')
+    ji = Count(name, cw.month, result)
+    ji.jisuan()
