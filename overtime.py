@@ -107,6 +107,10 @@ class Cwindow(object):
             title='获取月份', prompt='请输入月份', initialvalue=datetime.datetime.now().month - 1)
         self.month = month
 
+    def clearSheet(self):
+        # 对汇总表数据进行清理
+        Cmacro().dealData()
+
     def shutDown(self):
         root.destroy()
 
@@ -124,6 +128,8 @@ class Cwindow(object):
         btn1.pack(expand='yes')
         btn2 = tkinter.Button(root, text='获取月份', command=self.askMonth)
         btn2.pack(expand='yes')
+        btn4 = tkinter.Button(root, text='清理数据', command=self.clearSheet)
+        btn4.pack(expand='yes')
         btn3 = tkinter.Button(root, text='开始计算', command=self.shutDown)
         btn3.pack(expand='yes')
         # 加入消息循环
@@ -132,7 +138,7 @@ class Cwindow(object):
 
 class Count(object):
     def __init__(self, name, month, result):
-        self.fpath = '工程科.xlsm'
+        self.fpath = '计算结果.xlsx'
         # 节假日接口(工作日对应结果为 0, 休息日对应结果为 1, 节假日对应的结果为 2 )
         # server_url = "http://www.easybots.cn/api/holiday.php?d="
         self.server_url = "http://tool.bitefu.net/jiari/?d="
@@ -162,7 +168,7 @@ class Count(object):
         except ConnectionResetError as e:
             print('远程主机发生错误' + e)
 
-    # 调整工程科表里的加班小时数
+    # 调整表里的加班小时数
     def changeHour(self):
         temp17 = datetime.datetime.strptime('17:30', "%H:%M")
         temp18 = datetime.datetime.strptime('18:00', '%H:%M')
@@ -171,12 +177,12 @@ class Count(object):
         temp8 = datetime.datetime.strptime('8:00', "%H:%M")
         self.getUrl()
         for x in self.ws.rows:
-            if x[1].value == self.name:
+            if x[0].value == self.name:
                 if x[4].value == self.month:
-                    temp = x[2].value.strftime("%Y%m%d")
-                    time1 = x[7].value
-                    time2 = x[8].value
-                    if time1 != None and time2 != None:
+                    temp = x[1].value.strftime("%Y%m%d")
+                    time1 = x[2].value
+                    time2 = x[3].value
+                    if time1 != '' and time2 != '' and time1 != None and time2 != None:
                         if time2 > time1:
                             time1 = datetime.datetime.strptime(time1, "%H:%M")
                             time2 = datetime.datetime.strptime(time2, "%H:%M")
@@ -187,13 +193,13 @@ class Count(object):
                                     self.hour = (time2 - temp17).seconds
 
                             if self.hour > 0:
-                                x[3].value = self.hour / 3600
-                                s = x[2].value.strftime("%Y%m%d")
-                                self.dict[s] = x[3].value
+                                x[7].value = round(self.hour / 3600,2)
+                                s = x[1].value.strftime("%Y%m%d")
+                                self.dict[s] = x[7].value
                                 x[5].value = "工作日"
                                 self.hour = 0
                             else:
-                                x[3].value = 0
+                                x[7].value = 0
                                 x[5].value = "工作日"
                                 self.hour = 0
 
@@ -222,17 +228,17 @@ class Count(object):
                                                      datetime.timedelta(hours=0.5)).seconds
 
                                 if self.hour > 0:
-                                    x[3].value = self.hour / 3600
-                                    s = x[2].value.strftime("%Y%m%d")
-                                    self.dict[s] = x[3].value
+                                    x[7].value = round(self.hour / 3600,2)
+                                    s = x[1].value.strftime("%Y%m%d")
+                                    self.dict[s] = x[7].value
                                     x[5].value = "节假日"
                                     self.hour = 0
                                 else:
-                                    x[3].value = 0
+                                    x[7].value = 0
                                     x[5].value = "节假日"
                                     self.hour = 0
 
-        self.wb.save('工程科.xlsm')
+        self.wb.save('计算结果.xlsx')
 
     # 获得加班小时数
 
@@ -240,9 +246,9 @@ class Count(object):
         sum4 = 0
         for x in self.ws.rows:
             for y in self.cash.keys():
-                if x[1].value == self.name:
-                    if x[2].value.strftime("%Y%m%d") == y:
-                        sum4 = sum4 + x[3].value
+                if x[0].value == self.name:
+                    if x[1].value.strftime("%Y%m%d") == y:
+                        sum4 = sum4 + x[7].value
         return sum4
 
     def sumNum(self, **kw):
@@ -296,15 +302,15 @@ class Count(object):
     def setConvert(self):
         # 写入是转加班费self.cash还是转串休self.dicts
         for x in self.ws.rows:
-            if x[1].value == self.name:
+            if x[0].value == self.name:
                 for y in self.cash.keys():
-                    if x[2].value.strftime("%Y%m%d") == y:
+                    if x[1].value.strftime("%Y%m%d") == y:
                         x[6].value = "转加班费"
 
                 for y in self.dict.keys():
-                    if x[2].value.strftime("%Y%m%d") == y:
+                    if x[1].value.strftime("%Y%m%d") == y:
                         x[6].value = "转串休"
-        self.wb.save('工程科.xlsm')
+        self.wb.save('计算结果.xlsx')
 
     def setContents(self, sum, sum_chuan_xiu):
         rng = self.ws2['C2':'AG2']
@@ -315,7 +321,7 @@ class Count(object):
                         self.ws2.cell(row=name.row, column=y.column).value = self.dict[z]
         self.ws2.cell(row=name.row, column=34).value = sum
         self.ws2.cell(row=name.row, column=35).value = sum_chuan_xiu
-        self.wb.save('工程科.xlsm')
+        self.wb.save('计算结果.xlsx')
 
     def jiSuan(self):
         # 获得URL
@@ -377,30 +383,35 @@ class Count(object):
         print('转串休假：', sorted(self.dict.keys()))
         self.setConvert()
 
+
 class Cmacro():
     def __init__(self) -> None:
-        self.path='C:\\Users\\Administrator\\Documents\\GitHub\\overtime_python\\工程科.xlsm'
+        self.path = 'C:\\Users\\Administrator\\Documents\\GitHub\\overtime_python\\原始数据.xlsm'
 
     def dealData(self):
         pass
         excel = win32com.client.Dispatch("Excel.Application")
-        # excel.Visible = True
+        excel.Visible = True
         wb = excel.Workbooks.Open(self.path)
         print('START')
         excel.Application.Run("deleteRow")
         wb.Save()
+        wb.SaveAs(r'C:\Users\Administrator\Documents\GitHub\overtime_python\计算结果.xlsx', FileFormat=51,
+                  ConflictResolution=2)
         wb.Close()
+        print('END')
+
 
 cw = Cwindow()
 cw.createWindow()
-rili = Crili(2023, cw.month)
-result = rili.parseHTML()
-Cmacro().dealData()
-wb = load_workbook(filename='工程科.xlsm')
+# 获得工作日和节假日
+result = Crili(2023, cw.month).parseHTML()
+
+wb = load_workbook(filename='原始数据.xlsm')
 ws = wb['中干']
 for row in ws.iter_rows(min_row=3, max_row=ws.max_row, min_col=2, max_col=2):
     for name in row:
-        if name.value!=None:
+        if name.value != None:
             print(name.value, cw.month, '月')
             ji = Count(name, cw.month, result)
             ji.jiSuan()
