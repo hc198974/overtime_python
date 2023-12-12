@@ -124,8 +124,8 @@ class Cwindow(object):
         root.update()
         self.set_win_center(root, 300, 150)
         # 添加按钮
-        btn1 = tkinter.Button(root, text='获取用户名', command=self.askName)
-        btn1.pack(expand='yes')
+        # btn1 = tkinter.Button(root, text='获取用户名', command=self.askName)
+        # btn1.pack(expand='yes')
         btn2 = tkinter.Button(root, text='获取月份', command=self.askMonth)
         btn2.pack(expand='yes')
         btn4 = tkinter.Button(root, text='清理数据', command=self.clearSheet)
@@ -395,7 +395,6 @@ class Cmacro():
         wb = excel.Workbooks.Open(self.path)
         print('START')
         excel.Application.Run("deleteRow")
-        wb.Save()
         wb.SaveAs(r'C:\Users\Administrator\Documents\GitHub\overtime_python\计算结果.xlsx', FileFormat=51,
                   ConflictResolution=2)
         wb.Close()
