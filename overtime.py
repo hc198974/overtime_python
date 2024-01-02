@@ -248,7 +248,8 @@ class Count(object):
             for y in self.cash.keys():
                 if x[0].value == self.name:
                     if x[1].value.strftime("%Y%m%d") == y:
-                        sum4 = sum4 + x[7].value
+                        if x[7].value!=None:
+                            sum4 = sum4 + x[7].value
         return sum4
 
     def sumNum(self, **kw):
