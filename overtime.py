@@ -193,7 +193,7 @@ class Count(object):
                                     self.hour = (time2 - temp17).seconds
 
                             if self.hour > 0:
-                                x[7].value = round(self.hour / 3600,2)
+                                x[7].value = round(self.hour / 3600, 2)
                                 s = x[1].value.strftime("%Y%m%d")
                                 self.dict[s] = x[7].value
                                 x[5].value = "工作日"
@@ -217,18 +217,15 @@ class Count(object):
                                     pass
 
                                 if time2 <= temp12:
-                                    self.hour = (time2 - time1 -
-                                                 datetime.timedelta(hours=0.5)).seconds
+                                    self.hour = time2 - time1 - datetime.timedelta(hours=0.5)
                                 if time2 >= temp13:
                                     if time1 <= temp12:
-                                        self.hour = (time2 - time1 -
-                                                     datetime.timedelta(hours=1.5)).seconds
+                                        self.hour = time2 - time1 - datetime.timedelta(hours=1.5)
                                     else:
-                                        self.hour = (time2 - time1 -
-                                                     datetime.timedelta(hours=0.5)).seconds
+                                        self.hour = time2 - time1 - datetime.timedelta(hours=0.5)
 
-                                if self.hour > 0:
-                                    x[7].value = round(self.hour / 3600,2)
+                                if self.hour.days == 0:
+                                    x[7].value = round(self.hour.seconds / 3600, 2)
                                     s = x[1].value.strftime("%Y%m%d")
                                     self.dict[s] = x[7].value
                                     x[5].value = "节假日"
@@ -248,7 +245,7 @@ class Count(object):
             for y in self.cash.keys():
                 if x[0].value == self.name:
                     if x[1].value.strftime("%Y%m%d") == y:
-                        if x[7].value!=None:
+                        if x[7].value != None:
                             sum4 = sum4 + x[7].value
         return sum4
 
@@ -405,7 +402,7 @@ class Cmacro():
 cw = Cwindow()
 cw.createWindow()
 # 获得工作日和节假日
-result = Crili(2023, cw.month).parseHTML()
+result = Crili(2024, cw.month).parseHTML()
 
 wb = load_workbook(filename='原始数据.xlsm')
 ws = wb['中干']
