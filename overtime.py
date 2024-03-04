@@ -56,6 +56,8 @@ class Crili(object):
                         weekday = 2
                     elif item['class'] == 'wnrl_riqi_mo':
                         weekday = 1
+                    elif item['class'] == 'wnrl_riqi_ban':
+                        weekday = 0
                 else:
                     temp = datetime.datetime(self.year, self.month, i + 1)
                     if temp.weekday() > 4:
@@ -217,15 +219,19 @@ class Count(object):
                                     pass
 
                                 if time2 <= temp12:
-                                    self.hour = time2 - time1 - datetime.timedelta(hours=0.5)
+                                    self.hour = time2 - time1 - \
+                                        datetime.timedelta(hours=0.5)
                                 if time2 >= temp13:
                                     if time1 <= temp12:
-                                        self.hour = time2 - time1 - datetime.timedelta(hours=1.5)
+                                        self.hour = time2 - time1 - \
+                                            datetime.timedelta(hours=1.5)
                                     else:
-                                        self.hour = time2 - time1 - datetime.timedelta(hours=0.5)
+                                        self.hour = time2 - time1 - \
+                                            datetime.timedelta(hours=0.5)
 
                                 if self.hour.days == 0:
-                                    x[7].value = round(self.hour.seconds / 3600, 2)
+                                    x[7].value = round(
+                                        self.hour.seconds / 3600, 2)
                                     s = x[1].value.strftime("%Y%m%d")
                                     self.dict[s] = x[7].value
                                     x[5].value = "节假日"
@@ -316,7 +322,8 @@ class Count(object):
             for y in x:
                 for z in self.dict:
                     if y.value.strftime("%Y%m%d") == z:
-                        self.ws2.cell(row=name.row, column=y.column).value = self.dict[z]
+                        self.ws2.cell(
+                            row=name.row, column=y.column).value = self.dict[z]
         self.ws2.cell(row=name.row, column=34).value = sum
         self.ws2.cell(row=name.row, column=35).value = sum_chuan_xiu
         self.wb.save('计算结果.xlsx')
@@ -356,7 +363,8 @@ class Count(object):
                     self.dictSetcash(**self.workday)
                 else:
                     # 只对workday进行拆分就行
-                    self.dictSeprate(36.5 - sholiday - sweekday, **self.workday)
+                    self.dictSeprate(36.5 - sholiday -
+                                     sweekday, **self.workday)
             else:
                 # 对workday和weekday同时操作
                 min = self.dictSeprate(36.5 - sholiday, **self.weekday)
@@ -370,8 +378,7 @@ class Count(object):
         sum_chuan_xiu = round(sum - self.getHour(), 2)
         print('转串休小时：', sum_chuan_xiu)
         # 先清空单元格
-        for row in self.ws2.iter_rows(min_row=name.row, max_row=name.row
-                , min_col=3, max_col=35):
+        for row in self.ws2.iter_rows(min_row=name.row, max_row=name.row, min_col=3, max_col=35):
             for cell in row:
                 cell.value = None
         self.setContents(sum, sum_chuan_xiu)
