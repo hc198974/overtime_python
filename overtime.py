@@ -9,6 +9,7 @@ import requests
 from lxml import etree
 from openpyxl import load_workbook
 import win32com.client
+import time
 
 
 class Crili(object):
@@ -220,14 +221,14 @@ class Count(object):
 
                                 if time2 <= temp12:
                                     self.hour = time2 - time1 - \
-                                        datetime.timedelta(hours=0.5)
+                                                datetime.timedelta(hours=0.5)
                                 if time2 >= temp13:
                                     if time1 <= temp12:
                                         self.hour = time2 - time1 - \
-                                            datetime.timedelta(hours=1.5)
+                                                    datetime.timedelta(hours=1.5)
                                     else:
                                         self.hour = time2 - time1 - \
-                                            datetime.timedelta(hours=0.5)
+                                                    datetime.timedelta(hours=0.5)
 
                                 if self.hour.days == 0:
                                     x[7].value = round(
@@ -394,7 +395,6 @@ class Cmacro():
         self.path = 'C:\\Users\\Administrator\\Documents\\GitHub\\overtime_python\\原始数据.xlsm'
 
     def dealData(self):
-        pass
         excel = win32com.client.Dispatch("Excel.Application")
         excel.Visible = True
         wb = excel.Workbooks.Open(self.path)
@@ -406,6 +406,7 @@ class Cmacro():
         print('END')
 
 
+start = time.perf_counter()
 cw = Cwindow()
 cw.createWindow()
 # 获得工作日和节假日
@@ -421,3 +422,5 @@ for row in ws.iter_rows(min_row=3, max_row=ws.max_row, min_col=2, max_col=2):
             ji.jiSuan()
         else:
             break
+end = time.perf_counter()
+print("运行时间：", end - start)
