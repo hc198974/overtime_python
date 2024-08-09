@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 import calendar
 import datetime
+import itertools
 import tkinter
 import tkinter.simpledialog
-from itertools import combinations
-
 import requests
 from lxml import etree
 from openpyxl import load_workbook
 import win32com.client
+import time
 
 
 class Crili(object):
@@ -53,17 +53,17 @@ class Crili(object):
                 if 'class' in item:
                     temp = datetime.datetime(self.year, self.month, i + 1)
                     if item['class'] == 'wnrl_riqi_xiu':
-                        weekday = 2
+                        weekday = 3
                     elif item['class'] == 'wnrl_riqi_mo':
-                        weekday = 1
+                        weekday = 2
                     elif item['class'] == 'wnrl_riqi_ban':
-                        weekday = 0
+                        weekday = 1.5
                 else:
                     temp = datetime.datetime(self.year, self.month, i + 1)
                     if temp.weekday() > 4:
-                        weekday = 1
+                        weekday = 2
                     else:
-                        weekday = 0
+                        weekday = 1.5
 
                 result[temp.strftime('%Y%m%d')] = weekday
         return (result)
@@ -138,6 +138,22 @@ class Cwindow(object):
         root.mainloop()
 
 
+class Cmacro():
+    def __init__(self) -> None:
+        self.path = 'C:\\Users\\Administrator\\Desktop\\overtime_python_slow\\原始数据.xlsm'
+
+    def dealData(self):
+        excel = win32com.client.Dispatch("Excel.Application")
+        excel.Visible = True
+        wb = excel.Workbooks.Open(self.path)
+        print('START')
+        excel.Application.Run("deleteRow")
+        wb.SaveAs(r'C:\Users\Administrator\Desktop\overtime_python_slow\计算结果.xlsx', FileFormat=51,
+                  ConflictResolution=2)
+        wb.Close()
+        print('END')
+
+
 class Count(object):
     def __init__(self, name, month, result):
         self.fpath = '计算结果.xlsx'
@@ -160,11 +176,11 @@ class Count(object):
     def getUrl(self):
         try:
             for m in self.result:
-                if result[m] == 0:
+                if result[m] == 1.5:
                     self.workday[m] = 0
-                elif result[m] == 1:
-                    self.weekday[m] = 1
                 elif result[m] == 2:
+                    self.weekday[m] = 1
+                elif result[m] == 3:
                     self.holiday[m] = 2
 
         except ConnectionResetError as e:
@@ -243,66 +259,6 @@ class Count(object):
 
         self.wb.save('计算结果.xlsx')
 
-    # 获得加班小时数
-
-    def getHour(self):
-        sum4 = 0
-        for x in self.ws.rows:
-            for y in self.cash.keys():
-                if x[0].value == self.name:
-                    if x[1].value.strftime("%Y%m%d") == y:
-                        if x[7].value != None:
-                            sum4 = sum4 + x[7].value
-        return sum4
-
-    def sumNum(self, **kw):
-        sum3 = 0
-        for x in kw:
-            for y in self.dict:
-                if x == y:
-                    sum3 += self.dict[y]
-        return sum3
-
-    def dictSeprate(self, target, **kw):
-        tt = range(1, len(kw) + 1)
-        tup = []
-        min1 = 36.5
-        c = 0
-        minlist = []
-        for t in tt:
-            tup = list(combinations(tt, t)) + list(tup)
-
-        for x in tup:
-            newtup = []
-            sum1 = 0
-            for y in x:
-                c = 0
-                for m in kw:
-                    c += 1
-                    if c == y:
-                        newtup.append(m)
-
-            for n in self.dict:
-                for k in newtup:
-                    if k == n:
-                        if self.dict[n] > 0:
-                            sum1 += self.dict[n]
-
-            if sum1 <= target:
-                if min1 >= target - sum1:
-                    min1 = target - sum1
-                    minlist = newtup
-
-        for p in minlist:
-            for q in self.dict:
-                if p == q:
-                    self.cash[q] = '转加班费'
-        return min1
-
-    def dictSetcash(self, **kw):
-        for x in kw:
-            self.cash[x] = '转加班费'
-
     def setConvert(self):
         # 写入是转加班费self.cash还是转串休self.dicts
         for x in self.ws.rows:
@@ -331,57 +287,60 @@ class Count(object):
     def jiSuan(self):
         # 获得URL
         self.changeHour()
+        dict_1, dict_2, dict_3 = {}, {}, {}
+        for x in self.dict:
+            if self.result[x] == 1.5:
+                dict_1.update({x: self.dict[x]})
+            elif self.result[x] == 2:
+                dict_2.update(({x: self.dict[x]}))
+            elif self.result[x] == 3:
+                dict_3.update(({x: self.dict[x]}))
 
-        # 把self.holiday改回来
-        holiday = {}
-        weekday = {}
-        workday = {}
-        for m in self.dict:
-            if m in self.holiday:
-                holiday[m] = self.dict[m]
-            if m in self.weekday:
-                weekday[m] = self.dict[m]
-            if m in self.workday:
-                workday[m] = self.dict[m]
+        remainder = 36
+        if sum(list(self.dict.values())) > 36:
+            for p in [dict_3, dict_2, dict_1]:
+                if len(p) > 0:
+                    combine = []
+                    for r in range(1, len(p) + 1):
+                        combinations = list(itertools.combinations(p, r))
+                        for x in combinations:
+                            combine.append(x)
 
-        self.holiday = holiday
-        self.weekday = weekday
-        self.workday = workday
-        # 进行36.5小时判断
-        sholiday = self.sumNum(**self.holiday)
-        sweekday = self.sumNum(**self.weekday)
-        sworkday = self.sumNum(**self.workday)
-        sum = sholiday + sweekday + sworkday
+                    temp = {}
+                    smax = 0
+                    s = 0
+                    for m in combine:
+                        for n in m:
+                            s += self.dict[n]
 
-        self.getHour()
+                        if s <= remainder:
+                            if smax < s:
+                                smax = s
+                                temp.clear()
+                                for y in m:
+                                    temp.update({y: self.dict[y]})
+                                s = 0
+                            else:
+                                s = 0
+                        else:
+                            s = 0
 
-        if 36.5 - sholiday > 0:
-            self.dictSetcash(**self.holiday)
-            if 36.5 - sholiday - sweekday > 0:
-                self.dictSetcash(**self.weekday)
-                if 36.5 - sholiday - sweekday - sworkday > 0:
-                    self.dictSetcash(**self.workday)
-                else:
-                    # 只对workday进行拆分就行
-                    self.dictSeprate(36.5 - sholiday -
-                                     sweekday, **self.workday)
-            else:
-                # 对workday和weekday同时操作
-                min = self.dictSeprate(36.5 - sholiday, **self.weekday)
-                min = self.dictSeprate(min, **self.workday)
+                    self.cash.update(temp)
+                    remainder = remainder - sum(list(self.cash.values()))
         else:
-            pass
+            self.cash = self.dict.copy()
 
         print('总数据一览：', self.dict)
-        print('加班数合计：', round(sum, 2))
-        print('转加班小时：', round(self.getHour(), 2))
-        sum_chuan_xiu = round(sum - self.getHour(), 2)
+        print('加班数合计：', round(sum(list(self.dict.values())), 2))
+        print('转加班小时：', round(sum(list(self.cash.values())), 2))
+        sum_chuan_xiu = round(sum(list(self.dict.values())) -
+                              sum(list(self.cash.values())), 2)
         print('转串休小时：', sum_chuan_xiu)
         # 先清空单元格
         for row in self.ws2.iter_rows(min_row=name.row, max_row=name.row, min_col=3, max_col=35):
             for cell in row:
                 cell.value = None
-        self.setContents(sum, sum_chuan_xiu)
+        self.setContents(sum(list(self.dict.values())), sum_chuan_xiu)
         print("转加班费：", sorted(self.cash.keys()))
         for k in self.cash.keys():
             self.dict.pop(k)
@@ -389,23 +348,7 @@ class Count(object):
         self.setConvert()
 
 
-class Cmacro():
-    def __init__(self) -> None:
-        self.path = 'C:\\Users\\Administrator\\Documents\\GitHub\\overtime_python\\原始数据.xlsm'
-
-    def dealData(self):
-        pass
-        excel = win32com.client.Dispatch("Excel.Application")
-        excel.Visible = True
-        wb = excel.Workbooks.Open(self.path)
-        print('START')
-        excel.Application.Run("deleteRow")
-        wb.SaveAs(r'C:\Users\Administrator\Documents\GitHub\overtime_python\计算结果.xlsx', FileFormat=51,
-                  ConflictResolution=2)
-        wb.Close()
-        print('END')
-
-
+start = time.perf_counter()
 cw = Cwindow()
 cw.createWindow()
 # 获得工作日和节假日
@@ -421,3 +364,5 @@ for row in ws.iter_rows(min_row=3, max_row=ws.max_row, min_col=2, max_col=2):
             ji.jiSuan()
         else:
             break
+end = time.perf_counter()
+print("运行时间：", end - start)
