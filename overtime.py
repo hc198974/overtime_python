@@ -23,6 +23,7 @@ class Crili(object):
 
     def parseHTML(self):
         """页面解析"""
+        global weekday
         url = 'https://wannianrili.bmcx.com/ajax/'
         s = requests.session()
         headers = {
@@ -224,26 +225,26 @@ class Count(object):
                             # 周末和节假日
                             if temp in self.weekday or temp in self.holiday:
                                 if time1 > temp8:
-                                    if time1 > temp12 and time1 < temp13:
+                                    if temp12 < time1 < temp13:
                                         time1 = temp12
                                 else:
                                     time1 = temp8
 
-                                if time2 > temp12 and time2 < temp13:
+                                if temp12 < time2 < temp13:
                                     time2 = temp13
                                 else:
                                     pass
 
                                 if time2 <= temp12:
                                     self.hour = time2 - time1 - \
-                                        datetime.timedelta(hours=0.5)
+                                                datetime.timedelta(hours=0.5)
                                 if time2 >= temp13:
                                     if time1 <= temp12:
                                         self.hour = time2 - time1 - \
-                                            datetime.timedelta(hours=1.5)
+                                                    datetime.timedelta(hours=1.5)
                                     else:
                                         self.hour = time2 - time1 - \
-                                            datetime.timedelta(hours=0.5)
+                                                    datetime.timedelta(hours=0.5)
 
                                 if self.hour.days == 0:
                                     x[7].value = round(
@@ -308,22 +309,22 @@ class Count(object):
 
                     temp = {}
                     smax = 0
-                    s = 0
+                    total = 0
                     for m in combine:
                         for n in m:
-                            s += self.dict[n]
+                            total += self.dict[n]
 
-                        if s <= remainder:
-                            if smax < s:
-                                smax = s
+                        if total <= remainder:
+                            if smax < total:
+                                smax = total
                                 temp.clear()
                                 for y in m:
                                     temp.update({y: self.dict[y]})
-                                s = 0
+                                total = 0
                             else:
-                                s = 0
+                                total = 0
                         else:
-                            s = 0
+                            total = 0
 
                     self.cash.update(temp)
                     remainder = remainder - sum(list(self.cash.values()))
@@ -358,11 +359,12 @@ wb = load_workbook(filename='原始数据.xlsm')
 ws = wb['中干']
 for row in ws.iter_rows(min_row=3, max_row=ws.max_row, min_col=2, max_col=2):
     for name in row:
-        if name.value != None:
+        if name.value is not None:
             print(name.value, cw.month, '月')
             ji = Count(name, cw.month, result)
             ji.jiSuan()
         else:
             break
+
 end = time.perf_counter()
 print("运行时间：", end - start)
