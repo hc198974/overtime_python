@@ -1,75 +1,70 @@
 # -*- coding: utf-8 -*-
 import itertools
-import multiprocessing.process
 import time
-from threading import Thread
-import multiprocessing
-from multiprocessing import Pool, cpu_count, Process
+
+# from multiprocessing import Pool
+import os
+import threading
 
 
-class Count(object):
-    def __init__(self):
-        self.cash = {}
-        self.result = result
-        self.dict = dic[name]
+def jiSuan(name, result, dic):
+    # id = os.getpid()
+    id = threading.currentThread().ident
+    cash = {}
+    dict = dic[name]
+    dict_1, dict_2, dict_3 = {}, {}, {}
+    for x in dict:
+        if result[x] == 1.5:
+            dict_1.update({x: dict[x]})
+        elif result[x] == 2:
+            dict_2.update(({x: dict[x]}))
+        elif result[x] == 3:
+            dict_3.update(({x: dict[x]}))
 
-    def jiSuan(self, th):
-        # 获得URL
-        dict_1, dict_2, dict_3 = {}, {}, {}
-        for x in self.dict:
-            if self.result[x] == 1.5:
-                dict_1.update({x: self.dict[x]})
-            elif self.result[x] == 2:
-                dict_2.update(({x: self.dict[x]}))
-            elif self.result[x] == 3:
-                dict_3.update(({x: self.dict[x]}))
+    remainder = 36
+    if sum(list(dict.values())) > 36:
+        for p in [dict_3, dict_2, dict_1]:
+            if len(p) > 0:
+                combine = []
+                for r in range(1, len(p) + 1):
+                    combinations = list(itertools.combinations(p, r))
+                    for x in combinations:
+                        combine.append(x)
 
-        remainder = 36
-        if sum(list(self.dict.values())) > 36:
-            for p in [dict_3, dict_2, dict_1]:
-                if len(p) > 0:
-                    combine = []
-                    for r in range(1, len(p) + 1):
-                        combinations = list(itertools.combinations(p, r))
-                        for x in combinations:
-                            combine.append(x)
+                temp = {}
+                smax = 0
+                s = 0
+                for m in combine:
+                    for n in m:
+                        s += dict[n]
 
-                    temp = {}
-                    smax = 0
-                    s = 0
-                    for m in combine:
-                        for n in m:
-                            s += self.dict[n]
-
-                        if s <= remainder:
-                            if smax < s:
-                                smax = s
-                                temp.clear()
-                                for y in m:
-                                    temp.update({y: self.dict[y]})
-                                s = 0
-                            else:
-                                s = 0
+                    if s <= remainder:
+                        if smax < s:
+                            smax = s
+                            temp.clear()
+                            for y in m:
+                                temp.update({y: dict[y]})
+                            s = 0
                         else:
                             s = 0
+                    else:
+                        s = 0
 
-                    self.cash.update(temp)
-                    remainder = remainder - sum(list(self.cash.values()))
-        else:
-            self.cash = self.dict.copy()
+                cash.update(temp)
+                remainder = remainder - sum(list(cash.values()))
+    else:
+        cash = dict.copy()
 
-        print(name + " " + th)
-        print("总数据一览：", self.dict)
-        print("加班数合计：", round(sum(list(self.dict.values())), 2))
-        print("转加班小时：", round(sum(list(self.cash.values())), 2))
-        sum_chuan_xiu = round(
-            sum(list(self.dict.values())) - sum(list(self.cash.values())), 2
-        )
-        print("转串休小时：", sum_chuan_xiu)
+    print(name + " " + str(id))
+    print("总数据一览：", dict)
+    print("加班数合计：", round(sum(list(dict.values())), 2))
+    print("转加班小时：", round(sum(list(cash.values())), 2))
+    sum_chuan_xiu = round(sum(list(dict.values())) -
+                          sum(list(cash.values())), 2)
+    print("转串休小时：", sum_chuan_xiu)
 
 
 if __name__ == "__main__":
-    pool = Pool(processes=cpu_count())
     start = time.perf_counter()
     result = {
         "20240701": 1.5,
@@ -731,11 +726,17 @@ if __name__ == "__main__":
         },
     ]
 
-    k = 0
+    threads = []
     for dic in dict_all:
         for name in dic.keys():
-            ji = Count()
-            ji.jiSuan("1")
+            threads.append(threading.Thread(
+                target=jiSuan, args=(name, result, dic)))
+
+    for thread in threads:
+        thread.start()
+    # 等待线程结束
+    for thread in threads:
+        thread.join()
 
     end = time.perf_counter()
     print("运行时间：", end - start)
