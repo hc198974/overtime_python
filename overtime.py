@@ -401,12 +401,9 @@ if __name__ == "__main__":
         for name in row:
             if name.value is not None:
                 print(name.value, cw.month, "月")
-<<<<<<< HEAD
                 ji = Count(name, cw.month, result)
                 pool.apply_async(ji.jiSuan())
-=======
-                pool.apply_async(Count(name, cw.month, result).jiSuan())
->>>>>>> 48355450d1076a429540b87e12c7c6274d5141a9
+                # ji.jiSuan()
             else:
                 break
     pool.close()
