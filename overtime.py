@@ -9,6 +9,8 @@ from lxml import etree
 from openpyxl import load_workbook
 import win32com.client
 import time
+import os
+from multiprocessing import Pool
 
 
 class Crili(object):
@@ -210,16 +212,24 @@ class Count(object):
                     temp = x[1].value.strftime("%Y%m%d")
                     time1 = x[2].value
                     time2 = x[3].value
-                    if time1 != "" and time2 != "" and time1 is not None and time2 is not None:
+                    if (
+                        time1 != ""
+                        and time2 != ""
+                        and time1 is not None
+                        and time2 is not None
+                    ):
                         if type(time1) == str:
                             time1 = datetime.datetime.strptime(time1, "%H:%M")
                         elif type(time1) == datetime.time:
                             time1 = datetime.datetime.strptime(
-                                (time1.strftime("%H:%M")), "%H:%M")  # 先把datetime.time格式转换为str再转换为datetime.datetime
+                                (time1.strftime("%H:%M")), "%H:%M"
+                            )  # 先把datetime.time格式转换为str再转换为datetime.datetime
                         if type(time2) == str:
                             time2 = datetime.datetime.strptime(time2, "%H:%M")
                         elif type(time2) == datetime.time:
-                            time2 = datetime.datetime.strptime((time2.strftime("%H:%M")), "%H:%M")
+                            time2 = datetime.datetime.strptime(
+                                (time2.strftime("%H:%M")), "%H:%M"
+                            )
 
                         if time2 > time1:
                             # 工作日
@@ -253,24 +263,26 @@ class Count(object):
 
                                 if time2 <= temp12:
                                     self.hour = (
-                                            time2 - time1 - datetime.timedelta(hours=0.5)
+                                        time2 - time1 -
+                                        datetime.timedelta(hours=0.5)
                                     )
                                 if time2 >= temp13:
                                     if time1 <= temp12:
                                         self.hour = (
-                                                time2
-                                                - time1
-                                                - datetime.timedelta(hours=1.5)
+                                            time2
+                                            - time1
+                                            - datetime.timedelta(hours=1.5)
                                         )
                                     else:
                                         self.hour = (
-                                                time2
-                                                - time1
-                                                - datetime.timedelta(hours=0.5)
+                                            time2
+                                            - time1
+                                            - datetime.timedelta(hours=0.5)
                                         )
 
                                 if self.hour.days == 0:
-                                    x[7].value = round(self.hour.seconds / 3600, 2)
+                                    x[7].value = round(
+                                        self.hour.seconds / 3600, 2)
                                     s = x[1].value.strftime("%Y%m%d")
                                     self.dict[s] = x[7].value
                                     x[5].value = "节假日"
@@ -363,7 +375,7 @@ class Count(object):
         print("转串休小时：", sum_chuan_xiu)
         # 先清空单元格
         for row in self.ws2.iter_rows(
-                min_row=name.row, max_row=name.row, min_col=3, max_col=35
+            min_row=name.row, max_row=name.row, min_col=3, max_col=35
         ):
             for cell in row:
                 cell.value = None
@@ -375,22 +387,24 @@ class Count(object):
         self.setConvert()
 
 
-start = time.perf_counter()
-cw = Cwindow()
-cw.createWindow()
-# 获得工作日和节假日
-result = Crili(2024, cw.month).parseHTML()
+if __name__ == "__main__":
+    start = time.perf_counter()
+    cw = Cwindow()
+    cw.createWindow()
+    # 获得工作日和节假日
+    result = Crili(2024, cw.month).parseHTML()
 
-wb = load_workbook(filename="原始数据.xlsm")
-ws = wb["中干"]
-for row in ws.iter_rows(min_row=3, max_row=ws.max_row, min_col=2, max_col=2):
-    for name in row:
-        if name.value is not None:
-            print(name.value, cw.month, "月")
-            ji = Count(name, cw.month, result)
-            ji.jiSuan()
-        else:
-            break
-
-end = time.perf_counter()
-print("运行时间：", end - start)
+    wb = load_workbook(filename="原始数据.xlsm")
+    ws = wb["中干"]
+    pool = Pool(os.cpu_count())
+    for row in ws.iter_rows(min_row=3, max_row=ws.max_row, min_col=2, max_col=2):
+        for name in row:
+            if name.value is not None:
+                print(name.value, cw.month, "月")
+                pool.apply_async(Count(name, cw.month, result).jiSuan())
+            else:
+                break
+    pool.close()
+    pool.join()
+    end = time.perf_counter()
+    print("运行时间：", end - start)
