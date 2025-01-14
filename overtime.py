@@ -11,6 +11,7 @@ import win32com.client
 import time
 import os
 from multiprocessing import Pool
+import asyncio
 
 
 class Crili(object):
@@ -27,7 +28,6 @@ class Crili(object):
         """页面解析"""
         global weekday
         url = "https://wannianrili.bmcx.com/ajax/"
-        s = requests.session()
         headers = {
             "Host": "wannianrili.bmcx.com",
             "Connection": "keep-alive",
@@ -294,30 +294,27 @@ class Count(object):
 
         self.wb.save("计算结果.xlsx")
 
-    def setConvert(self):
-        # 写入是转加班费self.cash还是转串休self.dicts
-        for x in self.ws.rows:
-            if x[0].value == self.name:
-                for y in self.cash.keys():
-                    if x[1].value.strftime("%Y%m%d") == y:
-                        x[6].value = "转加班费"
-
-                for y in self.dict.keys():
-                    if x[1].value.strftime("%Y%m%d") == y:
-                        x[6].value = "转串休"
-        self.wb.save("计算结果.xlsx")
-
     def setContents(self, sum, sum_chuan_xiu):
+        # 把每日数据写入对应的汇总表的单元格重
         rng = self.ws2["C2":"AG2"]
         for x in rng:
             for y in x:
                 for z in self.dict:
                     if y.value.strftime("%Y%m%d") == z:
-                        self.ws2.cell(row=name.row, column=y.column).value = self.dict[
-                            z
-                        ]
+                        self.ws2.cell(
+                            row=name.row, column=y.column).value = self.dict[z]
+        # 写入总和
         self.ws2.cell(row=name.row, column=34).value = sum
         self.ws2.cell(row=name.row, column=35).value = sum_chuan_xiu
+        # 在中干表写入是转加班费还是串休
+        for x in self.ws.rows:
+            if x[0].value == self.name:
+                for y in self.dict.keys():
+                    if x[1].value.strftime("%Y%m%d") == y:
+                        if y in self.cash.keys():
+                            x[6].value = "转加班费"
+                        else:
+                            x[6].value = "转串休"
         self.wb.save("计算结果.xlsx")
 
     def jiSuan(self):
@@ -366,13 +363,9 @@ class Count(object):
         else:
             self.cash = self.dict.copy()
 
-        print("总数据一览：", self.dict)
-        print("加班数合计：", round(sum(list(self.dict.values())), 2))
-        print("转加班小时：", round(sum(list(self.cash.values())), 2))
         sum_chuan_xiu = round(
             sum(list(self.dict.values())) - sum(list(self.cash.values())), 2
         )
-        print("转串休小时：", sum_chuan_xiu)
         # 先清空单元格
         for row in self.ws2.iter_rows(
             min_row=name.row, max_row=name.row, min_col=3, max_col=35
@@ -380,22 +373,18 @@ class Count(object):
             for cell in row:
                 cell.value = None
         self.setContents(sum(list(self.dict.values())), sum_chuan_xiu)
-        print("转加班费：", sorted(self.cash.keys()))
-        for k in self.cash.keys():
-            self.dict.pop(k)
-        print("转串休假：", sorted(self.dict.keys()))
-        self.setConvert()
 
 
 if __name__ == "__main__":
-    start = time.perf_counter()
     cw = Cwindow()
     cw.createWindow()
+    start = time.perf_counter()
     # 获得工作日和节假日
     result = Crili(2024, cw.month).parseHTML()
-
     wb = load_workbook(filename="原始数据.xlsm")
     ws = wb["中干"]
+    end = time.perf_counter()
+    print("运行时间：", end - start)
     pool = Pool(os.cpu_count())
     for row in ws.iter_rows(min_row=3, max_row=ws.max_row, min_col=2, max_col=2):
         for name in row:

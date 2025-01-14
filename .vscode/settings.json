@@ -2,7 +2,7 @@
     "python.autoComplete.extraPaths": [
     
     ],
-    "python.defaultInterpreterPath": "E:\\ProgramData\\Anaconda3\\python.exe",
+    "python.defaultInterpreterPath": "C:\\ProgramData\\Anaconda3\\python.exe",
     "python.analysis.extraPaths": [],
     "Codegeex.Chat.LanguagePreference": "中文",
     "python.testing.unittestArgs": [
