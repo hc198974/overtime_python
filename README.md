@@ -9,4 +9,6 @@
 
     test.py用于测试pypy和cpython两种解释器的性能差异，纯python使用pypy更快，如果有C语言扩展等，需要使用cpython。
 
+    thread_process_test用于测试多线程和多进程，在overtime里直接测试协程。
+
 

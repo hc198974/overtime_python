@@ -116,8 +116,8 @@ class Cwindow(object):
         )
         self.month = month
 
-    def clearSheet(self):
-        # 对汇总表数据进行清理
+    def dealSheet(self):
+        # 对汇总表数据进行处理
         Cmacro().dealData()
 
     def shutDown(self):
@@ -137,7 +137,7 @@ class Cwindow(object):
         # btn1.pack(expand='yes')
         btn2 = tkinter.Button(root, text="获取月份", command=self.askMonth)
         btn2.pack(expand="yes")
-        btn4 = tkinter.Button(root, text="清理数据", command=self.clearSheet)
+        btn4 = tkinter.Button(root, text="处理数据", command=self.dealSheet)
         btn4.pack(expand="yes")
         btn3 = tkinter.Button(root, text="开始计算", command=self.shutDown)
         btn3.pack(expand="yes")
@@ -167,12 +167,11 @@ class Cmacro:
 
 
 class Count(object):
-    def __init__(self, name, month, result):
-        self.fpath = "计算结果.xlsx"
+    def __init__(self, name, month, result, wb):
         # 节假日接口(工作日对应结果为 0, 休息日对应结果为 1, 节假日对应的结果为 2 )
         # server_url = "http://www.easybots.cn/api/holiday.php?d="
         self.server_url = "http://tool.bitefu.net/jiari/?d="
-        self.wb = load_workbook(filename=self.fpath)
+        self.wb = wb
         self.ws = self.wb["汇总表"]
         self.ws2 = self.wb["中干"]
         self.name = name.value
@@ -294,19 +293,6 @@ class Count(object):
 
         self.wb.save("计算结果.xlsx")
 
-    def setConvert(self):
-        # 写入是转加班费self.cash还是转串休self.dicts
-        for x in self.ws.rows:
-            if x[0].value == self.name:
-                for y in self.cash.keys():
-                    if x[1].value.strftime("%Y%m%d") == y:
-                        x[6].value = "转加班费"
-
-                for y in self.dict.keys():
-                    if x[1].value.strftime("%Y%m%d") == y:
-                        x[6].value = "转串休"
-        self.wb.save("计算结果.xlsx")
-
     def setContents(self, sum, sum_chuan_xiu):
         rng = self.ws2["C2":"AG2"]
         for x in rng:
@@ -318,6 +304,15 @@ class Count(object):
                         ]
         self.ws2.cell(row=name.row, column=34).value = sum
         self.ws2.cell(row=name.row, column=35).value = sum_chuan_xiu
+        # 在中干表写入是转加班费还是串休
+        for x in self.ws.rows:
+            if x[0].value == self.name:
+                for y in self.dict.keys():
+                    if x[1].value.strftime("%Y%m%d") == y:
+                        if y in self.cash.keys():
+                            x[6].value = "转加班费"
+                        else:
+                            x[6].value = "转串休"
         self.wb.save("计算结果.xlsx")
 
     def jiSuan(self):
@@ -366,42 +361,39 @@ class Count(object):
         else:
             self.cash = self.dict.copy()
 
+        chuanxiu = {}
+        for m in self.dict.keys():
+            if m not in self.cash.keys():
+                chuanxiu[m] = self.dict[m]
         print("总数据一览：", self.dict)
         print("加班数合计：", round(sum(list(self.dict.values())), 2))
         print("转加班小时：", round(sum(list(self.cash.values())), 2))
-        sum_chuan_xiu = round(
-            sum(list(self.dict.values())) - sum(list(self.cash.values())), 2
-        )
-        print("转串休小时：", sum_chuan_xiu)
+        print("转串休小时：", round(sum(list(chuanxiu.values())), 2))
+        print("转加班费：", sorted(self.cash.keys()))
+        print("转串休假：", sorted(chuanxiu.keys()))
         # 先清空单元格
         for row in self.ws2.iter_rows(
             min_row=name.row, max_row=name.row, min_col=3, max_col=35
         ):
             for cell in row:
                 cell.value = None
-        self.setContents(sum(list(self.dict.values())), sum_chuan_xiu)
-        print("转加班费：", sorted(self.cash.keys()))
-        for k in self.cash.keys():
-            self.dict.pop(k)
-        print("转串休假：", sorted(self.dict.keys()))
-        self.setConvert()
+        self.setContents(sum(list(self.dict.values())), sum(chuanxiu.values()))
 
 
 if __name__ == "__main__":
-    start = time.perf_counter()
     cw = Cwindow()
     cw.createWindow()
+    start = time.perf_counter()
     # 获得工作日和节假日
     result = Crili(2024, cw.month).parseHTML()
-
-    wb = load_workbook(filename="原始数据.xlsm")
+    wb = load_workbook(filename="计算结果.xlsx")
     ws = wb["中干"]
     pool = Pool(os.cpu_count())
     for row in ws.iter_rows(min_row=3, max_row=ws.max_row, min_col=2, max_col=2):
         for name in row:
             if name.value is not None:
                 print(name.value, cw.month, "月")
-                ji = Count(name, cw.month, result)
+                ji = Count(name, cw.month, result, wb)
                 pool.apply_async(ji.jiSuan())
                 # ji.jiSuan()
             else:
