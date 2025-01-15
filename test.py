@@ -1,28 +1,28 @@
-import multiprocessing
-import os
-import asyncio
+import threading
+import time
 
-def cpu_bound_task():
-    print(f"子进程 {os.getpid()} 正在执行CPU密集型任务")
+def cpu_bound_task(num):
+    """一个计算密集型任务"""
     sum = 0
-    for i in range(1000000):
-        sum += i
-    print(f"子进程 {os.getpid()} CPU密集型任务完成，结果：{sum}")
+    for i in range(num):
+        sum += i * i
+
+def main():
+    start_time = time.time()
     
-
-def cpu2():
-    print(a)
-
-async def main():
-    process = multiprocessing.Process(target=cpu_bound_task)
-    process.start()
-    process.join()  # 等待进程完成
-
-if __name__ == '__main__':
-    # global a
-    a=5    
-    loop=asyncio.get_event_loop()
-    loop.run_until_complete(main())
-    print("主进程继续执行")
-    cpu_bound_task()
+    # 创建线程列表
+    threads = []
+    for _ in range(8):  # 创建8个线程
+        thread = threading.Thread(target=cpu_bound_task, args=(50000000,))
+        threads.append(thread)
+        thread.start()
     
+    # 等待所有线程完成
+    for thread in threads:
+        thread.join()
+    
+    end_time = time.time()
+    print(f"多线程执行时间：{end_time - start_time}秒")
+
+if __name__ == "__main__":
+    main()

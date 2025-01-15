@@ -2,7 +2,7 @@
 import itertools
 import time
 
-from multiprocessing import Pool
+# from multiprocessing import Pool
 import os
 import threading
 
@@ -738,13 +738,5 @@ if __name__ == "__main__":
     for thread in threads:
         thread.join()
 
-    p=Pool(os.cpu_count())
-    for dic in dict_all:
-        for name in dic.keys():
-            p.apply_async(jiSuan, (name, result, dic))
-        # jiSuan(name, result, dic)
-
-    p.close()
-    p.join()
     end = time.perf_counter()
     print("运行时间：", end - start)
