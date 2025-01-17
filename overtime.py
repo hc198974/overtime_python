@@ -11,6 +11,17 @@ import win32com.client
 import time
 import os
 from multiprocessing import Pool
+import functools
+
+
+def run_time(fn):
+    @functools.wraps(fn)
+    def wrapper(*args, **kw):
+        start = time.time()
+        res = fn(*args, **kw)
+        print('%s 运行了 %f 秒' % (fn.__name__, time.time() - start))
+        return res
+    return wrapper
 
 
 class Crili(object):
@@ -293,6 +304,7 @@ class Count(object):
 
         self.wb.save("计算结果.xlsx")
 
+    @run_time
     def setContents(self, sum, sum_chuan_xiu):
         rng = self.ws2["C2":"AG2"]
         for x in rng:
@@ -313,7 +325,7 @@ class Count(object):
                             x[6].value = "转加班费"
                         else:
                             x[6].value = "转串休"
-        self.wb.save("计算结果.xlsx")
+        # self.wb.save("计算结果.xlsx")
 
     def jiSuan(self):
         # 获得URL
@@ -400,5 +412,6 @@ if __name__ == "__main__":
                 break
     pool.close()
     pool.join()
+    wb.save("计算结果.xlsx")
     end = time.perf_counter()
     print("运行时间：", end - start)
