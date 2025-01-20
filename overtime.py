@@ -14,7 +14,7 @@ from multiprocessing import Pool
 import functools
 
 
-def run_time(fn):
+def run_time(fn):  # 用于测试方法运行时间的装饰器
     @functools.wraps(fn)
     def wrapper(*args, **kw):
         start = time.time()
@@ -204,7 +204,6 @@ class Count(object):
                     self.weekday[m] = 1
                 elif result[m] == 3:
                     self.holiday[m] = 2
-
         except ConnectionResetError as e:
             print("远程主机发生错误" + e)
 
@@ -304,7 +303,6 @@ class Count(object):
 
         self.wb.save("计算结果.xlsx")
 
-    @run_time
     def setContents(self, sum, sum_chuan_xiu):
         rng = self.ws2["C2":"AG2"]
         for x in rng:
@@ -325,19 +323,21 @@ class Count(object):
                             x[6].value = "转加班费"
                         else:
                             x[6].value = "转串休"
-        # self.wb.save("计算结果.xlsx")
 
+    @run_time
     def jiSuan(self):
         # 获得URL
         self.changeHour()
         dict_1, dict_2, dict_3 = {}, {}, {}
         for x in self.dict:
-            if self.result[x] == 1.5:
-                dict_1.update({x: self.dict[x]})
-            elif self.result[x] == 2:
-                dict_2.update(({x: self.dict[x]}))
-            elif self.result[x] == 3:
-                dict_3.update(({x: self.dict[x]}))
+            # 可以使用match进行模式匹配
+            match result[x]:
+                case 1.5:
+                    dict_1.update({x: self.dict[x]})
+                case 2:
+                    dict_2.update({x: self.dict[x]})
+                case 3:
+                    dict_3.update({x: self.dict[x]})
 
         remainder = 36
         if sum(list(self.dict.values())) > 36:
@@ -377,12 +377,12 @@ class Count(object):
         for m in self.dict.keys():
             if m not in self.cash.keys():
                 chuanxiu[m] = self.dict[m]
-        print("总数据一览：", self.dict)
-        print("加班数合计：", round(sum(list(self.dict.values())), 2))
-        print("转加班小时：", round(sum(list(self.cash.values())), 2))
-        print("转串休小时：", round(sum(list(chuanxiu.values())), 2))
-        print("转加班费：", sorted(self.cash.keys()))
-        print("转串休假：", sorted(chuanxiu.keys()))
+        # print("总数据一览：", self.dict)
+        # print("加班数合计：", round(sum(list(self.dict.values())), 2))
+        # print("转加班小时：", round(sum(list(self.cash.values())), 2))
+        # print("转串休小时：", round(sum(list(chuanxiu.values())), 2))
+        # print("转加班费：", sorted(self.cash.keys()))
+        # print("转串休假：", sorted(chuanxiu.keys()))
         # 先清空单元格
         for row in self.ws2.iter_rows(
             min_row=name.row, max_row=name.row, min_col=3, max_col=35
