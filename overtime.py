@@ -9,9 +9,11 @@ from lxml import etree
 from openpyxl import load_workbook
 import win32com.client
 import time
-import os
-from multiprocessing import Pool
 import functools
+# import threading
+
+# 全局变量
+testname = ""
 
 
 def run_time(fn):  # 用于测试方法运行时间的装饰器
@@ -19,7 +21,7 @@ def run_time(fn):  # 用于测试方法运行时间的装饰器
     def wrapper(*args, **kw):
         start = time.time()
         res = fn(*args, **kw)
-        print('%s 运行了 %f 秒' % (fn.__name__, time.time() - start))
+        print('%s 运行了 %f 秒' % (textname, time.time() - start))
         return res
     return wrapper
 
@@ -178,16 +180,18 @@ class Cmacro:
 
 
 class Count(object):
-    def __init__(self, name, month, result, wb):
+    def __init__(self, names, month, result, wb):
         # 节假日接口(工作日对应结果为 0, 休息日对应结果为 1, 节假日对应的结果为 2 )
         # server_url = "http://www.easybots.cn/api/holiday.php?d="
         self.server_url = "http://tool.bitefu.net/jiari/?d="
         self.wb = wb
         self.ws = self.wb["汇总表"]
         self.ws2 = self.wb["中干"]
-        self.name = name.value
+        self.names = names
+        self.name = ""
         self.month = month
         self.dict = {}
+        self.dictall = {}
         self.weekday = {}
         self.workday = {}
         self.holiday = {}
@@ -198,11 +202,11 @@ class Count(object):
     def getUrl(self):
         try:
             for m in self.result:
-                if result[m] == 1.5:
+                if self.result[m] == 1.5:
                     self.workday[m] = 0
-                elif result[m] == 2:
+                elif self.result[m] == 2:
                     self.weekday[m] = 1
-                elif result[m] == 3:
+                elif self.result[m] == 3:
                     self.holiday[m] = 2
         except ConnectionResetError as e:
             print("远程主机发生错误" + e)
@@ -215,129 +219,133 @@ class Count(object):
         temp13 = datetime.datetime.strptime("13:00", "%H:%M")
         temp8 = datetime.datetime.strptime("8:00", "%H:%M")
         self.getUrl()
-        for x in self.ws.rows:
-            if x[0].value == self.name:
+
+        for name in self.names:
+            dict = {}
+            for x in self.ws.rows:
                 if x[4].value == self.month:
-                    temp = x[1].value.strftime("%Y%m%d")
-                    time1 = x[2].value
-                    time2 = x[3].value
-                    if (
-                        time1 != ""
-                        and time2 != ""
-                        and time1 is not None
-                        and time2 is not None
-                    ):
-                        if type(time1) == str:
-                            time1 = datetime.datetime.strptime(time1, "%H:%M")
-                        elif type(time1) == datetime.time:
-                            time1 = datetime.datetime.strptime(
-                                (time1.strftime("%H:%M")), "%H:%M"
-                            )  # 先把datetime.time格式转换为str再转换为datetime.datetime
-                        if type(time2) == str:
-                            time2 = datetime.datetime.strptime(time2, "%H:%M")
-                        elif type(time2) == datetime.time:
-                            time2 = datetime.datetime.strptime(
-                                (time2.strftime("%H:%M")), "%H:%M"
-                            )
+                    if x[0].value == name.value:
+                        temp = x[1].value.strftime("%Y%m%d")
+                        time1 = x[2].value
+                        time2 = x[3].value
+                        if (
+                            time1 != ""
+                            and time2 != ""
+                            and time1 is not None
+                            and time2 is not None
+                        ):
+                            if type(time1) == str:
+                                time1 = datetime.datetime.strptime(
+                                    time1, "%H:%M")
+                            elif type(time1) == datetime.time:
+                                time1 = datetime.datetime.strptime(
+                                    (time1.strftime("%H:%M")), "%H:%M"
+                                )  # 先把datetime.time格式转换为str再转换为datetime.datetime
+                            if type(time2) == str:
+                                time2 = datetime.datetime.strptime(
+                                    time2, "%H:%M")
+                            elif type(time2) == datetime.time:
+                                time2 = datetime.datetime.strptime(
+                                    (time2.strftime("%H:%M")), "%H:%M"
+                                )
 
-                        if time2 > time1:
-                            # 工作日
-                            if temp in self.workday:
-                                if time2 > temp18:
-                                    self.hour = (time2 - temp17).seconds
+                            if time2 > time1:
+                                # 工作日
+                                if temp in self.workday:
+                                    if time2 > temp18:
+                                        self.hour = (time2 - temp17).seconds
 
-                            if self.hour > 0:
-                                x[7].value = round(self.hour / 3600, 2)
-                                s = x[1].value.strftime("%Y%m%d")
-                                self.dict[s] = x[7].value
-                                x[5].value = "工作日"
-                                self.hour = 0
-                            else:
-                                x[7].value = 0
-                                x[5].value = "工作日"
-                                self.hour = 0
-
-                            # 周末和节假日
-                            if temp in self.weekday or temp in self.holiday:
-                                if time1 > temp8:
-                                    if temp12 < time1 < temp13:
-                                        time1 = temp12
-                                else:
-                                    time1 = temp8
-
-                                if temp12 < time2 < temp13:
-                                    time2 = temp13
-                                else:
-                                    pass
-
-                                if time2 <= temp12:
-                                    self.hour = (
-                                        time2 - time1 -
-                                        datetime.timedelta(hours=0.5)
-                                    )
-                                if time2 >= temp13:
-                                    if time1 <= temp12:
-                                        self.hour = (
-                                            time2
-                                            - time1
-                                            - datetime.timedelta(hours=1.5)
-                                        )
-                                    else:
-                                        self.hour = (
-                                            time2
-                                            - time1
-                                            - datetime.timedelta(hours=0.5)
-                                        )
-
-                                if self.hour.days == 0:
-                                    x[7].value = round(
-                                        self.hour.seconds / 3600, 2)
+                                if self.hour > 0:
+                                    x[7].value = round(self.hour / 3600, 2)
                                     s = x[1].value.strftime("%Y%m%d")
-                                    self.dict[s] = x[7].value
-                                    x[5].value = "节假日"
+                                    dict[s] = x[7].value
+                                    x[5].value = "工作日"
                                     self.hour = 0
                                 else:
                                     x[7].value = 0
-                                    x[5].value = "节假日"
+                                    x[5].value = "工作日"
                                     self.hour = 0
 
-        self.wb.save("计算结果.xlsx")
+                                # 周末和节假日
+                                if temp in self.weekday or temp in self.holiday:
+                                    if time1 > temp8:
+                                        if temp12 < time1 < temp13:
+                                            time1 = temp12
+                                    else:
+                                        time1 = temp8
 
-    def setContents(self, sum, sum_chuan_xiu):
+                                    if temp12 < time2 < temp13:
+                                        time2 = temp13
+                                    else:
+                                        pass
+
+                                    if time2 <= temp12:
+                                        self.hour = (
+                                            time2 - time1 -
+                                            datetime.timedelta(hours=0.5)
+                                        )
+                                    if time2 >= temp13:
+                                        if time1 <= temp12:
+                                            self.hour = (
+                                                time2
+                                                - time1
+                                                - datetime.timedelta(hours=1.5)
+                                            )
+                                        else:
+                                            self.hour = (
+                                                time2
+                                                - time1
+                                                - datetime.timedelta(hours=0.5)
+                                            )
+
+                                    if self.hour.days == 0:
+                                        x[7].value = round(
+                                            self.hour.seconds / 3600, 2)
+                                        s = x[1].value.strftime("%Y%m%d")
+                                        dict[s] = x[7].value
+                                        x[5].value = "节假日"
+                                        self.hour = 0
+                                    else:
+                                        x[7].value = 0
+                                        x[5].value = "节假日"
+                                        self.hour = 0
+                self.dictall[name.value] = dict
+
+    def setContents(self):
         rng = self.ws2["C2":"AG2"]
         for x in rng:
             for y in x:
                 for z in self.dict:
                     if y.value.strftime("%Y%m%d") == z:
-                        self.ws2.cell(row=name.row, column=y.column).value = self.dict[
+                        self.ws2.cell(row=self.name.row, column=y.column).value = self.dict[
                             z
                         ]
-        self.ws2.cell(row=name.row, column=34).value = sum
-        self.ws2.cell(row=name.row, column=35).value = sum_chuan_xiu
+        self.ws2.cell(row=self.name.row, column=34).value = sum(
+            list(self.dict.values()))
+        self.ws2.cell(row=self.name.row, column=35).value = sum(
+            list(self.dict.values()))-sum(list(self.cash.values()))
         # 在中干表写入是转加班费还是串休
         for x in self.ws.rows:
-            if x[0].value == self.name:
-                for y in self.dict.keys():
-                    if x[1].value.strftime("%Y%m%d") == y:
-                        if y in self.cash.keys():
-                            x[6].value = "转加班费"
-                        else:
-                            x[6].value = "转串休"
+            if x[0].value == self.name and x[7].value > 0:
+                if x[1].value.strftime("%Y%m%d") in self.cash.keys():
+                    x[6].value = "转加班费"
+                else:
+                    x[6].value = "转串休"
 
     @run_time
-    def jiSuan(self):
-        # 获得URL
-        self.changeHour()
+    def count2name(self):
+        global textname
+        textname = self.name.value
+        self.cash.clear()
+        self.dict = self.dictall.get(self.name.value)
         dict_1, dict_2, dict_3 = {}, {}, {}
         for x in self.dict:
-            # 可以使用match进行模式匹配
-            match result[x]:
-                case 1.5:
-                    dict_1.update({x: self.dict[x]})
-                case 2:
-                    dict_2.update({x: self.dict[x]})
-                case 3:
-                    dict_3.update({x: self.dict[x]})
+            if self.result[x] == 1.5:
+                dict_1.update({x: self.dict[x]})
+            elif self.result[x] == 2:
+                dict_2.update({x: self.dict[x]})
+            elif self.result[x] == 3:
+                dict_3.update({x: self.dict[x]})
 
         remainder = 36
         if sum(list(self.dict.values())) > 36:
@@ -369,27 +377,38 @@ class Count(object):
                             total = 0
 
                     self.cash.update(temp)
+                    temp.clear
                     remainder = remainder - sum(list(self.cash.values()))
+
         else:
             self.cash = self.dict.copy()
 
-        chuanxiu = {}
-        for m in self.dict.keys():
-            if m not in self.cash.keys():
-                chuanxiu[m] = self.dict[m]
         # print("总数据一览：", self.dict)
-        # print("加班数合计：", round(sum(list(self.dict.values())), 2))
+        # print("加班数合计：", round(sum(list(self.dcit.values())), 2))
         # print("转加班小时：", round(sum(list(self.cash.values())), 2))
         # print("转串休小时：", round(sum(list(chuanxiu.values())), 2))
         # print("转加班费：", sorted(self.cash.keys()))
         # print("转串休假：", sorted(chuanxiu.keys()))
-        # 先清空单元格
-        for row in self.ws2.iter_rows(
-            min_row=name.row, max_row=name.row, min_col=3, max_col=35
-        ):
+        self.setContents()
+
+    def jiSuan(self):
+        # 获得URL
+        self.changeHour()
+        for row in self.ws2.iter_rows(min_row=3, max_row=self.ws2.max_row, min_col=3, max_col=35):
             for cell in row:
                 cell.value = None
-        self.setContents(sum(list(self.dict.values())), sum(chuanxiu.values()))
+
+        threads = []
+        for name in self.names:
+            # 数据量不大，使用多进程开销大，使用多线程速度更快
+            self.name = name
+            self.count2name()
+            # threads.append(threading.Thread(target=self.count2name))
+
+        # for thread in threads:
+        #     thread.start()
+        # for thread in threads:
+        #     thread.join()
 
 
 if __name__ == "__main__":
@@ -400,18 +419,15 @@ if __name__ == "__main__":
     result = Crili(2024, cw.month).parseHTML()
     wb = load_workbook(filename="计算结果.xlsx")
     ws = wb["中干"]
-    pool = Pool(os.cpu_count())
+    names = []
     for row in ws.iter_rows(min_row=3, max_row=ws.max_row, min_col=2, max_col=2):
         for name in row:
             if name.value is not None:
-                print(name.value, cw.month, "月")
-                ji = Count(name, cw.month, result, wb)
-                pool.apply_async(ji.jiSuan())
-                # ji.jiSuan()
+                names.append(name)
             else:
                 break
-    pool.close()
-    pool.join()
+    ji = Count(names, cw.month, result, wb)
+    ji.jiSuan()
     wb.save("计算结果.xlsx")
     end = time.perf_counter()
     print("运行时间：", end - start)
