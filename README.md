@@ -10,6 +10,6 @@
 
     test.py用于测试pypy和cpython两种解释器的性能差异，纯python使用pypy更快，如果有C语言扩展等，需要使用cpython。
 
-    thread_process_test用于测试多线程和多进程。
+    thread_process_test用于测试多线程和多进程，程序较小，效果不好。
 
     openpyxl打开xlsm文件很慢，打开文件和保存操作比较废时间。

@@ -10,7 +10,6 @@ from openpyxl import load_workbook
 import win32com.client
 import time
 import functools
-# import threading
 
 # 全局变量
 testname = ""
@@ -398,25 +397,18 @@ class Count(object):
             for cell in row:
                 cell.value = None
 
-        threads = []
         for name in self.names:
-            # 数据量不大，使用多进程开销大，使用多线程速度更快
+            # 数据量不大，使用多进程开销大，多线程容易出现错误
             self.name = name
             self.count2name()
-            # threads.append(threading.Thread(target=self.count2name))
-
-        # for thread in threads:
-        #     thread.start()
-        # for thread in threads:
-        #     thread.join()
 
 
 if __name__ == "__main__":
     cw = Cwindow()
     cw.createWindow()
     start = time.perf_counter()
-    # 获得工作日和节假日
-    result = Crili(2024, cw.month).parseHTML()
+    获得工作日和节假日
+    result = Crili(2025, cw.month).parseHTML()
     wb = load_workbook(filename="计算结果.xlsx")
     ws = wb["中干"]
     names = []
