@@ -10,12 +10,8 @@ from openpyxl import load_workbook
 import win32com.client
 import time
 import functools
-import numba
 import pandas as pd
 import numpy as np
-
-# 全局变量
-testname = ""
 
 
 def run_time(fn):  # 用于测试方法运行时间的装饰器
@@ -224,16 +220,17 @@ def custom_gettime(row):
     return result
 
 
-def getgroup(group3, group2, group1):
+def getgroup(df, group3, group2, group1):
+    jiaban = []
     remainer = 36
     if not group3.empty:
         # 先默认3倍加班费超不过36小时
-        group3.loc[group3['时长'] != 0, ['加班或串休']] = '转加班'
+        jiaban.append(group3.index)
         remainer = remainer - group3['时长'].sum()
 
     if not group2.empty:
         if remainer >= group2['时长'].sum():
-            group2.loc[group2['时长'] != 0, ['加班或串休']] = '转加班'
+            jiaban.append(group2.index)
             remainer = remainer - group2['时长'].sum()
         else:
             coms = []
@@ -244,53 +241,56 @@ def getgroup(group3, group2, group1):
 
             max = 0
             total = 0
-            print(coms)
+            # coms范例：[[(247,), (255,), (261,)], [(247, 255), (247, 261), (255, 261)], [(247, 255, 261)]]
             for c in coms:
                 for x in c:
-                    total = sum(lambda z: group2.loc[z, ['时长']] for z in x)
-                    print(total)
-                    if sum(y['时长']) <= remainer:
-                        if sum(y['时长']) > max:
-                            max = sum(y['时长'])
-                            df_max = y
+                    for z in x:
+                        total = total+df.loc[z, ['时长']].values
+                    if total <= remainer:
+                        if total > max:
+                            max = total
+                            df_max = x
 
-            group2.loc[group2['日报日期'].isin(df_max), ['加班或串休']] = '转加班'
-            group2.loc[~group2['日报日期'].isin(df_max), ['加班或串休']] = '转串休'
-            remainer = remainer - sum(df_max['时长'])
+            jiaban.append(df_max)
+            # group2.loc[~group2['日报日期'].isin(df_max), group2['时长'] != 0,['加班或串休']] = '转串休'
+            remainer = remainer - max
 
     if not group1.empty:
         if remainer >= group1['时长'].sum():
-            group1.loc[group1['时长'] != 0, ['加班或串休']] = '转加班'
+            group1.loc[group1['时长'] != 0, ['加班或串休']] = 1
             remainer = remainer - group1['时长'].sum()
         else:
-            coms = np.array([])
+            coms = []
             for i in range(len(group1.loc[group1['时长'] != 0, ['时长']])):
                 combinations = list(
-                    itertools.combinations(group1.itertuples(), i+1))
-                coms = np.append(combinations, coms)
+                    itertools.combinations(list(group1[group1['时长'] != 0].index), i+1))
+                coms.append(combinations)
 
             max = 0
+            total = 0
+            # coms范例：[[(247,), (255,), (261,)], [(247, 255), (247, 261), (255, 261)], [(247, 255, 261)]]
             for c in coms:
-                if sum(c['时长']) <= remainer:
-                    if sum(c) > max:
-                        max = sum(c)
-                        df_max = c
-            group1.loc[group1['日报日期'].isin(df_max), ['加班或串休']] = '转加班'
-            group1.loc[~group1['日报日期'].isin(df_max), ['加班或串休']] = '转串休'
-            remainer = remainer - sum(df_max['时长'])
-            print(group1)
+                for x in c:
+                    total = sum(
+                        list(map(lambda z: df.loc[z, ['时长']].values, x)))
+                    if total <= remainer:
+                        if total > max:
+                            max = total
+                            df_max = x
+            jiaban.append(df_max)
+            remainer = remainer - max
+    print(jiaban)
 
-
-def custom_getgroup(group):
+def custom_getgroup(df, group):
     if group[group['时长'] != 0].empty:
         print('空')
     elif group['时长'].sum() <= 36:
-        group.loc[group['时长'] != 0, ['加班或串休']] = '转加班'
+        group.loc[group['时长'] != 0, ['加班或串休']] = 1
     else:
         group3 = group[group['节假日'] == 3]
         group2 = group[group['节假日'] == 2]
         group1 = group[group['节假日'] == 1.5]
-        getgroup(group3, group2, group1)
+        getgroup(df, group3, group2, group1)
 
 
 def main(result):
@@ -304,7 +304,7 @@ def main(result):
     # # 分组计算
     grouped = df.groupby(['姓名'])
     for name, group in grouped:
-        custom_getgroup(group)
+        custom_getgroup(df, group)
 
 
 if __name__ == "__main__":
