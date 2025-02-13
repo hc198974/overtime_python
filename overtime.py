@@ -359,6 +359,7 @@ class Count(object):
                     temp = {}
                     smax = 0
                     total = 0
+                    start = time.perf_counter()
                     for m in combine:
                         for n in m:
                             total += self.dict[n]
@@ -375,6 +376,8 @@ class Count(object):
                         else:
                             total = 0
 
+                    end = time.perf_counter()
+                    print("运行时间df：", end-start)
                     self.cash.update(temp)
                     temp.clear
                     remainder = remainder - sum(list(self.cash.values()))
@@ -407,7 +410,7 @@ if __name__ == "__main__":
     cw = Cwindow()
     cw.createWindow()
     start = time.perf_counter()
-    获得工作日和节假日
+    # 获得工作日和节假日
     result = Crili(2025, cw.month).parseHTML()
     wb = load_workbook(filename="计算结果.xlsx")
     ws = wb["中干"]

@@ -2,6 +2,7 @@
 import calendar
 import datetime
 import itertools
+from platform import node
 import tkinter
 import tkinter.simpledialog
 import requests
@@ -19,7 +20,7 @@ def run_time(fn):  # 用于测试方法运行时间的装饰器
     def wrapper(*args, **kw):
         start = time.time()
         res = fn(*args, **kw)
-        print('%s 运行了 %f 秒' % (textname, time.time() - start))
+        print('%s 运行了 %f 秒' % (fn.__name__, time.time() - start))
         return res
     return wrapper
 
@@ -220,17 +221,18 @@ def custom_gettime(row):
     return result
 
 
-def getgroup(df, group3, group2, group1):
+@run_time
+def getgroup(dict, group3, group2, group1):
     jiaban = []
     remainer = 36
     if not group3.empty:
         # 先默认3倍加班费超不过36小时
-        jiaban.append(group3.index)
+        jiaban.append(tuple(group3.index))
         remainer = remainer - group3['时长'].sum()
 
     if not group2.empty:
         if remainer >= group2['时长'].sum():
-            jiaban.append(group2.index)
+            jiaban.append(tuple(group2.index))
             remainer = remainer - group2['时长'].sum()
         else:
             coms = []
@@ -240,16 +242,16 @@ def getgroup(df, group3, group2, group1):
                 coms.append(combinations)
 
             max = 0
-            total = 0
             # coms范例：[[(247,), (255,), (261,)], [(247, 255), (247, 261), (255, 261)], [(247, 255, 261)]]
-            for c in coms:
-                for x in c:
-                    for z in x:
-                        total = total+df.loc[z, ['时长']].values
-                    if total <= remainer:
-                        if total > max:
-                            max = total
-                            df_max = x
+            tuples = [t for sublist in coms for t in sublist]
+            for indexes in tuples:
+                total = 0
+                for z in indexes:
+                    total += dict[z]
+                if total <= remainer:
+                    if total > max:
+                        max = total
+                        df_max = indexes
 
             jiaban.append(df_max)
             # group2.loc[~group2['日报日期'].isin(df_max), group2['时长'] != 0,['加班或串休']] = '转串休'
@@ -257,54 +259,64 @@ def getgroup(df, group3, group2, group1):
 
     if not group1.empty:
         if remainer >= group1['时长'].sum():
-            group1.loc[group1['时长'] != 0, ['加班或串休']] = 1
             remainer = remainer - group1['时长'].sum()
         else:
             coms = []
-            for i in range(len(group1.loc[group1['时长'] != 0, ['时长']])):
+            for i in range(len(group1)):
                 combinations = list(
-                    itertools.combinations(list(group1[group1['时长'] != 0].index), i+1))
+                    itertools.combinations(list(group1.index), i+1))
                 coms.append(combinations)
-
-            max = 0
-            total = 0
             # coms范例：[[(247,), (255,), (261,)], [(247, 255), (247, 261), (255, 261)], [(247, 255, 261)]]
-            for c in coms:
-                for x in c:
-                    total = sum(
-                        list(map(lambda z: df.loc[z, ['时长']].values, x)))
-                    if total <= remainer:
-                        if total > max:
-                            max = total
-                            df_max = x
+            max = 0
+            tuples = [t for sublist in coms for t in sublist]
+            for indexes in tuples:
+                total = 0
+                for z in indexes:
+                    total += dict[z]
+                if total <= remainer:
+                    if total > max:
+                        max = total
+                        df_max = indexes
             jiaban.append(df_max)
             remainer = remainer - max
-    print(jiaban)
 
-def custom_getgroup(df, group):
+    return jiaban
+
+
+def custom_getgroup(dict, group):
+    jiaban = []
     if group[group['时长'] != 0].empty:
         print('空')
     elif group['时长'].sum() <= 36:
-        group.loc[group['时长'] != 0, ['加班或串休']] = 1
+        jiaban.append([group[group['时长'] != 0].index])
     else:
-        group3 = group[group['节假日'] == 3]
-        group2 = group[group['节假日'] == 2]
-        group1 = group[group['节假日'] == 1.5]
-        getgroup(df, group3, group2, group1)
+        group3 = group[(group['节假日'] == 3) & (group['时长'] > 0)]
+        group2 = group.query('节假日 == 2 & 时长 > 0')
+        group1 = group.query('节假日 == 1.5 & 时长 > 0')
+        return getgroup(dict, group3, group2, group1)
 
 
 def main(result):
+    list = []
     # 读取Excel文件，默认第一个表《汇总表》
     df = pd.read_excel('计算结果.xlsx')
     df['日报日期'] = df['日报日期'].dt.strftime('%Y%m%d')
     df.drop('节假日', axis=1, inplace=True)
     df = df.merge(result)
     df['时长'] = df.apply(lambda row: custom_gettime(row), axis=1)
+    dict = df["时长"].to_dict()
     # print(df)
     # # 分组计算
     grouped = df.groupby(['姓名'])
     for name, group in grouped:
-        custom_getgroup(df, group)
+        result = custom_getgroup(dict, group)
+        if not result is None:
+            for tuple in result:
+                for index in tuple:
+                    list.append(index)
+    df.loc[df.index.isin(list), '加班或串休'] = 1
+    df.loc[(~df.index.isin(list)) & (df["时长"] > 0), '加班或串休'] = 0
+    # df.to_excel('site.xlsx', index=False)
 
 
 if __name__ == "__main__":
