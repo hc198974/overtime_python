@@ -2,13 +2,13 @@
 import calendar
 import datetime
 import itertools
-from platform import node
 import tkinter
 import tkinter.simpledialog
 import requests
 from lxml import etree
 from openpyxl import load_workbook
 import win32com.client
+
 import time
 import functools
 import pandas as pd
@@ -221,7 +221,7 @@ def custom_gettime(row):
     return result
 
 
-@run_time
+# @run_time
 def getgroup(dict, group3, group2, group1):
     jiaban = []
     remainer = 36
@@ -286,7 +286,7 @@ def getgroup(dict, group3, group2, group1):
 def custom_getgroup(dict, group):
     jiaban = []
     if group[group['时长'] != 0].empty:
-        print('空')
+        pass
     elif group['时长'].sum() <= 36:
         jiaban.append([group[group['时长'] != 0].index])
     else:
@@ -305,7 +305,6 @@ def main(result):
     df = df.merge(result)
     df['时长'] = df.apply(lambda row: custom_gettime(row), axis=1)
     dict = df["时长"].to_dict()
-    # print(df)
     # # 分组计算
     grouped = df.groupby(['姓名'])
     for name, group in grouped:
@@ -316,7 +315,32 @@ def main(result):
                     list.append(index)
     df.loc[df.index.isin(list), '加班或串休'] = 1
     df.loc[(~df.index.isin(list)) & (df["时长"] > 0), '加班或串休'] = 0
-    # df.to_excel('site.xlsx', index=False)
+    df.to_excel('site.xlsx', index=False, sheet_name='明细')
+    # 新建一个dataframe
+    unique_names = df['姓名'].unique()
+    unique_dates = df['日报日期'].unique()
+    unique_dates.sort()
+    new_df = pd.DataFrame(columns=['姓名'] + unique_dates.tolist()+['合计'])
+    new_df['姓名'] = unique_names
+    # 填充数值
+    # 根据姓名和日期从 df 里查询到相应的值
+    for i, row in new_df.iterrows():
+        name = row['姓名']
+        for date in unique_dates:
+            # 从 df 中筛选出符合姓名和日期的记录
+            filtered_df = df[(df['姓名'] == name) & (df['日报日期'] == date)]
+            if not filtered_df.empty:
+                # 假设要填充的值为时长列的值，可根据实际情况修改
+                new_df.at[i, date] = filtered_df['时长'].values[0]
+            else:
+                new_df.at[i, date] = 0
+
+    # 计算合计列的值
+    new_df['合计'] = new_df[unique_dates].sum(axis=1)
+    #多表导出到excel
+    with pd.ExcelWriter("site.xlsx") as writer:
+        df.to_excel(writer, index=False, sheet_name='明细')
+        new_df.to_excel(writer, index=False, sheet_name='汇总')
 
 
 if __name__ == "__main__":

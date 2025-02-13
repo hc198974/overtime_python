@@ -7,7 +7,7 @@ import tkinter.simpledialog
 import requests
 from lxml import etree
 from openpyxl import load_workbook
-import win32com.client
+# import win32com.client
 import time
 import functools
 

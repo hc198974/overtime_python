@@ -1,13 +1,14 @@
 import pandas as pd
 
-# 创建示例 DataFrame
+# 构造示例数据
 data = {
-    'Name': ['Alice', 'Bob', 'Charlie'],
-    'Age': [25, 30, 35],
-    'City': ['New York', 'Los Angeles', 'Chicago']
+'Name': ['Alice', 'Bob', 'Charlie'],
+'Age': [25, 30, 35],
+'City': ['New York', 'Los Angeles', 'Chicago']
 }
 df = pd.DataFrame(data)
 
-# 将默认索引和 'Age' 列转换为字典
-result_dict = df['Age'].to_dict()
-print(result_dict)
+# 使用 iterrows() 逐行迭代
+for index, row in df.iterrows():
+    print(f"Index: {index}")
+    print(f"Row data:\n{row}\n")
