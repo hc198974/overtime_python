@@ -7,7 +7,7 @@ import tkinter.simpledialog
 import requests
 from lxml import etree
 from openpyxl import load_workbook
-# import win32com.client
+import win32com.client
 import time
 import functools
 
@@ -311,6 +311,16 @@ class Count(object):
                 self.dictall[name.value] = dict
 
     def setContents(self):
+        # 在中干表写入是转加班费还是串休
+
+        for x in self.ws.rows:
+            if not x[7].value is None:
+                if x[0].value == self.name.value and x[7].value > 0:
+                    if x[1].value.strftime("%Y%m%d") in self.cash.keys():
+                        x[6].value = "转加班费"
+                    else:
+                        x[6].value = "转串休"
+
         rng = self.ws2["C2":"AG2"]
         for x in rng:
             for y in x:
@@ -323,13 +333,6 @@ class Count(object):
             list(self.dict.values()))
         self.ws2.cell(row=self.name.row, column=35).value = sum(
             list(self.dict.values()))-sum(list(self.cash.values()))
-        # 在中干表写入是转加班费还是串休
-        for x in self.ws.rows:
-            if x[0].value == self.name and x[7].value > 0:
-                if x[1].value.strftime("%Y%m%d") in self.cash.keys():
-                    x[6].value = "转加班费"
-                else:
-                    x[6].value = "转串休"
 
     @run_time
     def count2name(self):
@@ -359,7 +362,6 @@ class Count(object):
                     temp = {}
                     smax = 0
                     total = 0
-                    start = time.perf_counter()
                     for m in combine:
                         for n in m:
                             total += self.dict[n]
@@ -376,8 +378,6 @@ class Count(object):
                         else:
                             total = 0
 
-                    end = time.perf_counter()
-                    print("运行时间df：", end-start)
                     self.cash.update(temp)
                     temp.clear
                     remainder = remainder - sum(list(self.cash.values()))

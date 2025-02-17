@@ -8,7 +8,6 @@ import requests
 from lxml import etree
 from openpyxl import load_workbook
 import win32com.client
-
 import time
 import functools
 import pandas as pd
@@ -254,7 +253,6 @@ def getgroup(dict, group3, group2, group1):
                         df_max = indexes
 
             jiaban.append(df_max)
-            # group2.loc[~group2['日报日期'].isin(df_max), group2['时长'] != 0,['加班或串休']] = '转串休'
             remainer = remainer - max
 
     if not group1.empty:
@@ -277,9 +275,10 @@ def getgroup(dict, group3, group2, group1):
                     if total > max:
                         max = total
                         df_max = indexes
-            jiaban.append(df_max)
-            remainer = remainer - max
-
+            try:
+                jiaban.append(df_max)
+            except:
+                print(remainer)
     return jiaban
 
 
@@ -315,7 +314,6 @@ def main(result):
                     list.append(index)
     df.loc[df.index.isin(list), '加班或串休'] = 1
     df.loc[(~df.index.isin(list)) & (df["时长"] > 0), '加班或串休'] = 0
-    df.to_excel('site.xlsx', index=False, sheet_name='明细')
     # 新建一个dataframe
     unique_names = df['姓名'].unique()
     unique_dates = df['日报日期'].unique()
@@ -337,10 +335,13 @@ def main(result):
 
     # 计算合计列的值
     new_df['合计'] = new_df[unique_dates].sum(axis=1)
-    #多表导出到excel
+    # 多表导出到excel
+    start = time.perf_counter()
     with pd.ExcelWriter("site.xlsx") as writer:
         df.to_excel(writer, index=False, sheet_name='明细')
         new_df.to_excel(writer, index=False, sheet_name='汇总')
+    en = time.perf_counter()
+    print("时间：", en-start)
 
 
 if __name__ == "__main__":
