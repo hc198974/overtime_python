@@ -6,12 +6,10 @@ import tkinter
 import tkinter.simpledialog
 import requests
 from lxml import etree
-from openpyxl import load_workbook
 import win32com.client
 import time
 import functools
 import pandas as pd
-import numpy as np
 
 
 def run_time(fn):  # 用于测试方法运行时间的装饰器
@@ -36,9 +34,7 @@ class Crili(object):
 
     def parseHTML(self):
         """页面解析"""
-        global weekday
         url = "https://wannianrili.bmcx.com/ajax/"
-        s = requests.session()
         headers = {
             "Host": "wannianrili.bmcx.com",
             "Connection": "keep-alive",
@@ -178,32 +174,27 @@ class Cmacro:
         wb.Close()
         print("END")
 
+def custom_gettime(df):
+    temp17 = datetime.datetime.strptime("17:30", "%H:%M").time()
+    temp18 = datetime.datetime.strptime("18:00", "%H:%M").time()
+    temp12 = datetime.datetime.strptime("12:00", "%H:%M").time()
+    temp13 = datetime.datetime.strptime("13:00", "%H:%M").time()
+    temp8 = datetime.datetime.strptime("8:00", "%H:%M").time()
 
-def custom_gettime(row):
-    result = 0
-    sb = row['上班时间']
-    xb = row['下班时间']
-    temp17 = datetime.datetime.strptime("17:30", "%H:%M")
-    temp18 = datetime.datetime.strptime("18:00", "%H:%M")
-    temp12 = datetime.datetime.strptime("12:00", "%H:%M")
-    temp13 = datetime.datetime.strptime("13:00", "%H:%M")
-    temp8 = datetime.datetime.strptime("8:00", "%H:%M")
-    if not pd.isna(sb) and not pd.isna(xb):
-        if type(sb) == str:
-            sb = datetime.datetime.strptime(sb, "%H:%M")
-        elif type(sb) == datetime.time:
-            sb = datetime.datetime.strptime(sb.strftime("%H:%M"))
-
-        if type(xb) == str:
-            xb = datetime.datetime.strptime(xb, "%H:%M")
-        elif type(xb) == datetime.time:
-            xb = datetime.datetime.strptime(xb.strftime("%H:%M"))
+    def calculate_time(row):
+        sb = row['上班时间']
+        xb = row['下班时间']
+        if pd.isna(sb) or pd.isna(xb):
+            return 0
+        if isinstance(sb, str):
+            sb = datetime.datetime.strptime(sb, "%H:%M").time()
+        if isinstance(xb, str):
+            xb = datetime.datetime.strptime(xb, "%H:%M").time()
         if row['节假日'] == 1.5:
             if xb >= sb and sb <= temp17:
                 if xb >= temp18:
-                    result = round(((xb-temp17).seconds)/3600, 2)
-            else:
-                result = 0
+                    return round((datetime.datetime.combine(datetime.date.today(), xb) - datetime.datetime.combine(datetime.date.today(), temp17)).seconds / 3600, 2)
+            return 0
         else:
             if xb >= sb:
                 if sb < temp8:
@@ -212,15 +203,14 @@ def custom_gettime(row):
                     sb = temp13
                 if xb > temp12 and xb < temp13:
                     xb = temp13
-
                 if xb > sb:
-                    result = round(((xb-sb).seconds)/3600, 2)
-            else:
-                result = 0
-    return result
+                    return round((datetime.datetime.combine(datetime.date.today(), xb) - datetime.datetime.combine(datetime.date.today(), sb)).seconds / 3600, 2)
+            return 0
+
+    df['时长'] = df.apply(calculate_time, axis=1)
+    return df
 
 
-# @run_time
 def getgroup(dict, group3, group2, group1):
     jiaban = []
     remainer = 36
@@ -281,7 +271,6 @@ def getgroup(dict, group3, group2, group1):
                 print(remainer)
     return jiaban
 
-
 def custom_getgroup(dict, group):
     jiaban = []
     if group[group['时长'] != 0].empty:
@@ -294,6 +283,16 @@ def custom_getgroup(dict, group):
         group1 = group.query('节假日 == 1.5 & 时长 > 0')
         return getgroup(dict, group3, group2, group1)
 
+def generate_summary_table(df):
+    # 创建数据透视表，列为日期，index 为姓名，values 为时长求和
+    pivot = df.pivot_table(index='姓名', columns='日报日期',
+                           values='时长', aggfunc='sum', fill_value=0)
+    # 添加合计列
+    pivot['合计'] = pivot.sum(axis=1)
+    # 重置索引
+    summary_df = pivot.reset_index()
+    return summary_df
+
 
 def main(result):
     list = []
@@ -302,10 +301,10 @@ def main(result):
     df['日报日期'] = df['日报日期'].dt.strftime('%Y%m%d')
     df.drop('节假日', axis=1, inplace=True)
     df = df.merge(result)
-    df['时长'] = df.apply(lambda row: custom_gettime(row), axis=1)
+    df = custom_gettime(df)
     dict = df["时长"].to_dict()
     # # 分组计算
-    grouped = df.groupby(['姓名'])
+    grouped = df.groupby(['姓名'],sort=True)
     for name, group in grouped:
         result = custom_getgroup(dict, group)
         if not result is None:
@@ -314,34 +313,14 @@ def main(result):
                     list.append(index)
     df.loc[df.index.isin(list), '加班或串休'] = 1
     df.loc[(~df.index.isin(list)) & (df["时长"] > 0), '加班或串休'] = 0
-    # 新建一个dataframe
-    unique_names = df['姓名'].unique()
-    unique_dates = df['日报日期'].unique()
-    unique_dates.sort()
-    new_df = pd.DataFrame(columns=['姓名'] + unique_dates.tolist()+['合计'])
-    new_df['姓名'] = unique_names
-    # 填充数值
-    # 根据姓名和日期从 df 里查询到相应的值
-    for i, row in new_df.iterrows():
-        name = row['姓名']
-        for date in unique_dates:
-            # 从 df 中筛选出符合姓名和日期的记录
-            filtered_df = df[(df['姓名'] == name) & (df['日报日期'] == date)]
-            if not filtered_df.empty:
-                # 假设要填充的值为时长列的值，可根据实际情况修改
-                new_df.at[i, date] = filtered_df['时长'].values[0]
-            else:
-                new_df.at[i, date] = 0
-
-    # 计算合计列的值
-    new_df['合计'] = new_df[unique_dates].sum(axis=1)
+    # 新建一个pivot_table
+    summary_df = generate_summary_table(df)
     # 多表导出到excel
     start = time.perf_counter()
     with pd.ExcelWriter("site.xlsx") as writer:
-        df.to_excel(writer, index=False, sheet_name='明细')
-        new_df.to_excel(writer, index=False, sheet_name='汇总')
-    en = time.perf_counter()
-    print("时间：", en-start)
+        df.to_excel(writer, index=False, sheet_name='明细',engine='openpyxl')
+        summary_df.to_excel(writer, index=False, sheet_name='汇总',engine='openpyxl')
+    print("时间：", time.perf_counter()-start)
 
 
 if __name__ == "__main__":
