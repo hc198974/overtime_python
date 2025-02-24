@@ -174,6 +174,7 @@ class Cmacro:
         wb.Close()
         print("END")
 
+
 def custom_gettime(df):
     temp17 = datetime.datetime.strptime("17:30", "%H:%M").time()
     temp18 = datetime.datetime.strptime("18:00", "%H:%M").time()
@@ -196,15 +197,22 @@ def custom_gettime(df):
                     return round((datetime.datetime.combine(datetime.date.today(), xb) - datetime.datetime.combine(datetime.date.today(), temp17)).seconds / 3600, 2)
             return 0
         else:
-            if xb >= sb:
+            delta = round((datetime.datetime.combine(datetime.date.today(
+            ), xb) - datetime.datetime.combine(datetime.date.today(), sb)).seconds/3600, 2)
+            if delta > 0.5:
                 if sb < temp8:
                     sb = temp8
                 if sb > temp12 and sb < temp13:
                     sb = temp13
                 if xb > temp12 and xb < temp13:
                     xb = temp13
-                if xb > sb:
-                    return round((datetime.datetime.combine(datetime.date.today(), xb) - datetime.datetime.combine(datetime.date.today(), sb)).seconds / 3600, 2)
+                # 计算加班时间
+                delta = round((datetime.datetime.combine(datetime.date.today(
+                ), xb) - datetime.datetime.combine(datetime.date.today(), sb)).seconds/3600, 2)
+                if xb >= temp13 and sb <= temp12:
+                    return delta-1.5
+                else:
+                    return delta-0.5
             return 0
 
     df['时长'] = df.apply(calculate_time, axis=1)
@@ -271,6 +279,7 @@ def getgroup(dict, group3, group2, group1):
                 print(remainer)
     return jiaban
 
+
 def custom_getgroup(dict, group):
     jiaban = []
     if group[group['时长'] != 0].empty:
@@ -282,6 +291,7 @@ def custom_getgroup(dict, group):
         group2 = group.query('节假日 == 2 & 时长 > 0')
         group1 = group.query('节假日 == 1.5 & 时长 > 0')
         return getgroup(dict, group3, group2, group1)
+
 
 def generate_summary_table(df):
     # 创建数据透视表，列为日期，index 为姓名，values 为时长求和
@@ -304,7 +314,7 @@ def main(result):
     df = custom_gettime(df)
     dict = df["时长"].to_dict()
     # # 分组计算
-    grouped = df.groupby(['姓名'],sort=True)
+    grouped = df.groupby(['姓名'], sort=True)
     for name, group in grouped:
         result = custom_getgroup(dict, group)
         if not result is None:
@@ -318,8 +328,9 @@ def main(result):
     # 多表导出到excel
     start = time.perf_counter()
     with pd.ExcelWriter("site.xlsx") as writer:
-        df.to_excel(writer, index=False, sheet_name='明细',engine='openpyxl')
-        summary_df.to_excel(writer, index=False, sheet_name='汇总',engine='openpyxl')
+        df.to_excel(writer, index=False, sheet_name='明细', engine='openpyxl')
+        summary_df.to_excel(writer, index=False,
+                            sheet_name='汇总', engine='openpyxl')
     print("时间：", time.perf_counter()-start)
 
 
