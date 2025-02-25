@@ -335,9 +335,9 @@ def main(result):
 
 
 if __name__ == "__main__":
-    # cw = Cwindow()
-    # cw.createWindow()
-    result = Crili(2025, 1).parseHTML()
+    cw = Cwindow()
+    cw.createWindow()
+    result = Crili(2025, cw.month).parseHTML()
     start = time.perf_counter()
     main(result)
     end = time.perf_counter()
