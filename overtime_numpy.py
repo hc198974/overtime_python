@@ -78,14 +78,60 @@ class Crili(object):
                 result[temp.strftime("%Y%m%d")] = weekday
         return result
 
+
 @run_time
 def overtime_cal(datas, result):
-    print(len(result))
     """加班计算"""
     for i in range(len(datas)//len(result)):
         chunk = datas[i*len(result):(i*len(result))+(len(result)-1)]
-        dealdata(chunk, result)
+        chunk = dealdata(chunk, result)
+        chunk = maximize_value(chunk)
         # modified_chunk = np.append(chunk, dealdata(chunk, result), axis=1)
+
+
+def maximize_value(result, max_sum=36000):
+
+    if sum([row[7] for row in result]) <= max_sum/1000:
+        for row in result:
+            if row[7] > 0:
+                row[6] = '转加班'
+        return result
+    else:
+
+        weights = [int(round(row[7], 2)*1000) for row in result]
+        values = [int(round(row[7], 2) * row[5]*1000)
+                  for row in result]
+        n = len(weights)
+        # 创建动态规划表
+        dp = [[0] * (max_sum + 1) for _ in range(n + 1)]
+
+        # 填充动态规划表
+        for i in range(1, n + 1):
+            for w in range(max_sum + 1):
+                if weights[i-1] <= w:
+                    dp[i][w] = max(dp[i-1][w], dp[i-1]
+                                   [w-weights[i-1]] + values[i-1])
+                else:
+                    dp[i][w] = dp[i-1][w]
+
+        # 回溯找到选择的物品
+        w = max_sum
+        items = []
+        for i in range(n, 0, -1):
+            if dp[i][w] != dp[i-1][w]:
+                items.append(list(result[i-1]))
+                w -= weights[i-1]
+
+        # 检查某一行是否在 selected_items 中
+        for row in result:
+            row1 = list(row)
+            if row1 in items:
+                if row[7] > 0:
+                    row[6] = '转加班'
+            else:
+                if row[7] > 0:
+                    row[6] = '转串休'
+        return result
 
 
 def dealdata(chunk, result):
@@ -130,9 +176,12 @@ def dealdata(chunk, result):
         if i[1] in result:
             i[5] = result[i[1]]
         # 第二步计算加班小时数
-        i[7] = calculate_time(i[2], i[3], i[5])
+        temp = calculate_time(i[2], i[3], i[5])
+        if temp < 0:
+            temp = 0
+        i[7] = temp
 
-    # 第三步计算加班金额    
+    # 第三步计算加班金额
     return chunk
 
 
