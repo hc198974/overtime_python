@@ -12,7 +12,6 @@ import time
 import functools
 
 # 全局变量
-testname = ""
 
 
 def run_time(fn):  # 用于测试方法运行时间的装饰器
@@ -20,7 +19,7 @@ def run_time(fn):  # 用于测试方法运行时间的装饰器
     def wrapper(*args, **kw):
         start = time.time()
         res = fn(*args, **kw)
-        print('%s 运行了 %f 秒' % (textname, time.time() - start))
+        print('%s 运行了 %f 秒' % (fn, time.time() - start))
         return res
     return wrapper
 
@@ -334,7 +333,7 @@ class Count(object):
         self.ws2.cell(row=self.name.row, column=35).value = sum(
             list(self.dict.values()))-sum(list(self.cash.values()))
 
-    @run_time
+    # @run_time
     def count2name(self):
         global textname
         textname = self.name.value
@@ -423,6 +422,5 @@ if __name__ == "__main__":
                 break
     ji = Count(names, cw.month, result, wb)
     ji.jiSuan()
-    wb.save("计算结果.xlsx")
-    end = time.perf_counter()
-    print("运行时间：", end - start)
+    wb.save("site.xlsx")
+    print("运行时间：", time.perf_counter() - start)
