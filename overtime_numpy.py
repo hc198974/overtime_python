@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import calendar
 import datetime
-import itertools
 import requests
 from lxml import etree
 import time
@@ -82,50 +81,59 @@ class Crili(object):
 @run_time
 def overtime_cal(datas, result):
     """加班计算"""
+    modified_chunk = []
     for i in range(len(datas)//len(result)):
         chunk = datas[i*len(result):(i*len(result))+(len(result)-1)]
         chunk = dealdata(chunk, result)
+        # print(chunk)
         chunk = maximize_value(chunk)
-        # modified_chunk = np.append(chunk, dealdata(chunk, result), axis=1)
+        modified_chunk.append(chunk)
+
+    flat_list = [item for sublist in modified_chunk for item in sublist]
+    # 转换为DataFrame
+    df = pd.DataFrame(flat_list, columns=[
+        '姓名', '日报日期', '上班时间', '下班时间',
+        '月份', '节假日', '加班或串休', '时长'
+    ])
+    return df
+
+# 1-0背包问题，使用动态规划解决
 
 
 def maximize_value(result, max_sum=36000):
-
-    if sum([row[7] for row in result]) <= max_sum/1000:
+    if sum([row[7] for row in result]) <= max_sum / 1000:
         for row in result:
             if row[7] > 0:
                 row[6] = '转加班'
         return result
     else:
-
-        weights = [int(round(row[7], 2)*1000) for row in result]
-        values = [int(round(row[7], 2) * row[5]*1000)
-                  for row in result]
+        weights = [int(row[7] * 1000) for row in result]
+        values = [int(row[7] * row[5] * 1000) for row in result]
         n = len(weights)
+
         # 创建动态规划表
         dp = [[0] * (max_sum + 1) for _ in range(n + 1)]
 
         # 填充动态规划表
         for i in range(1, n + 1):
             for w in range(max_sum + 1):
-                if weights[i-1] <= w:
-                    dp[i][w] = max(dp[i-1][w], dp[i-1]
-                                   [w-weights[i-1]] + values[i-1])
+                if weights[i - 1] <= w:
+                    dp[i][w] = max(dp[i - 1][w], dp[i - 1]
+                                   [w - weights[i - 1]] + values[i - 1])
                 else:
-                    dp[i][w] = dp[i-1][w]
+                    dp[i][w] = dp[i - 1][w]
 
         # 回溯找到选择的物品
         w = max_sum
-        items = []
+        selected_items = []
         for i in range(n, 0, -1):
-            if dp[i][w] != dp[i-1][w]:
-                items.append(list(result[i-1]))
-                w -= weights[i-1]
+            if dp[i][w] != dp[i - 1][w]:
+                selected_items.append(result[i - 1])
+                w -= weights[i - 1]
 
         # 检查某一行是否在 selected_items 中
         for row in result:
-            row1 = list(row)
-            if row1 in items:
+            if row in selected_items:
                 if row[7] > 0:
                     row[6] = '转加班'
             else:
@@ -134,7 +142,7 @@ def maximize_value(result, max_sum=36000):
         return result
 
 
-def dealdata(chunk, result):
+def dealdata(chunk, calendar):
     def calculate_time(sb, xb, isweekend):
         temp17 = datetime.datetime.strptime("17:30", "%H:%M").time()
         temp18 = datetime.datetime.strptime("18:00", "%H:%M").time()
@@ -167,33 +175,47 @@ def dealdata(chunk, result):
                 delta = round((datetime.datetime.combine(datetime.date.today(
                 ), xb) - datetime.datetime.combine(datetime.date.today(), sb)).seconds/3600, 2)
                 if xb >= temp13 and sb <= temp12:
-                    return delta-1.5
+                    return max(delta-1.5, 0)  # 防止出现负数
                 else:
-                    return delta-0.5
+                    return max(delta-0.5, 0)
             return 0
-    for i in chunk:
-        # 先导入节假日
-        if i[1] in result:
-            i[5] = result[i[1]]
-        # 第二步计算加班小时数
-        temp = calculate_time(i[2], i[3], i[5])
-        if temp < 0:
-            temp = 0
-        i[7] = temp
 
-    # 第三步计算加班金额
+    # 先导入节假日
+    chunk[:, 5] = np.vectorize(calendar.get, otypes=[np.float64])(
+        chunk[:, 1]).astype(float)
+    # 第二步计算加班小时数
+    chunk[:, 7] = np.vectorize(calculate_time, otypes=[np.float64])(
+        chunk[:, 2], chunk[:, 3], chunk[:, 5])
+    chunk = chunk.tolist()
+
     return chunk
+
+
+def generate_summary_table(df):
+    # 创建数据透视表，列为日期，index 为姓名，values 为时长求和
+    pivot = df.pivot_table(index='姓名', columns='日报日期',
+                           values='时长', aggfunc='sum', fill_value=0)
+    # 添加合计列
+    pivot['合计'] = pivot.sum(axis=1)
+    # 重置索引
+    summary_df = pivot.reset_index()
+    return summary_df
 
 
 if __name__ == "__main__":
     start = time.perf_counter()
     # 获得工作日和节假日
-    result = Crili(2025, 1).parseHTML()
+    calendar = Crili(2025, 1).parseHTML()
     df = pd.read_excel('计算结果.xlsx')
     df['日报日期'] = df['日报日期'].dt.strftime('%Y%m%d')
     datas = df.to_numpy()
     sorted_indices = np.argsort(datas[:, 0])  # 获取排序索引
     datas = datas[sorted_indices]  # 按索引重新排列数组
-    overtime_cal(datas, result)
-    end = time.perf_counter()
-    print("运行时间：", end - start)
+    df = overtime_cal(datas, calendar)
+    summary_df = generate_summary_table(df)
+    # 多表导出到excel
+    with pd.ExcelWriter("site.xlsx") as writer:
+        df.to_excel(writer, index=False, sheet_name='明细', engine='openpyxl')
+        summary_df.to_excel(writer, index=False,
+                            sheet_name='汇总', engine='openpyxl')
+    print("运行时间：", time.perf_counter() - start)
