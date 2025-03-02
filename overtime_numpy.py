@@ -12,9 +12,9 @@ import numpy as np
 def run_time(fn):  # 用于测试方法运行时间的装饰器
     @functools.wraps(fn)
     def wrapper(*args, **kw):
-        start = time.time()
+        start = time.perf_counter()
         res = fn(*args, **kw)
-        print('%s 运行了 %f 秒' % (fn, time.time() - start))
+        print('%s 运行了 %f 秒' % (fn, time.perf_counter() - start))
         return res
     return wrapper
 
@@ -33,7 +33,6 @@ class Crili(object):
         """页面解析"""
         global weekday
         url = "https://wannianrili.bmcx.com/ajax/"
-        s = requests.session()
         headers = {
             "Host": "wannianrili.bmcx.com",
             "Connection": "keep-alive",
@@ -106,40 +105,36 @@ def maximize_value(result, max_sum=36000):
             if row[7] > 0:
                 row[6] = '转加班'
         return result
-    else:
-        weights = [int(row[7] * 1000) for row in result]
-        values = [int(row[7] * row[5] * 1000) for row in result]
-        n = len(weights)
 
-        # 创建动态规划表
-        dp = [[0] * (max_sum + 1) for _ in range(n + 1)]
+    # 使用滚动数组优化
+    weights = [int(row[7] * 1000) for row in result]
+    values = [int(row[7] * row[5] * 1000) for row in result]
+    n = len(weights)
 
-        # 填充动态规划表
-        for i in range(1, n + 1):
-            for w in range(max_sum + 1):
-                if weights[i - 1] <= w:
-                    dp[i][w] = max(dp[i - 1][w], dp[i - 1]
-                                   [w - weights[i - 1]] + values[i - 1])
-                else:
-                    dp[i][w] = dp[i - 1][w]
+    # 创建一维 DP 数组
+    dp = [0] * (max_sum + 1)
 
-        # 回溯找到选择的物品
-        w = max_sum
-        selected_items = []
-        for i in range(n, 0, -1):
-            if dp[i][w] != dp[i - 1][w]:
-                selected_items.append(result[i - 1])
-                w -= weights[i - 1]
+    # 填充 DP 数组
+    for i in range(n):
+        for w in range(max_sum, weights[i] - 1, -1):
+            dp[w] = max(dp[w], dp[w - weights[i]] + values[i])
 
-        # 检查某一行是否在 selected_items 中
-        for row in result:
-            if row in selected_items:
-                if row[7] > 0:
-                    row[6] = '转加班'
-            else:
-                if row[7] > 0:
-                    row[6] = '转串休'
-        return result
+    # 回溯找到选择的物品
+    w = max_sum
+    selected_items = set()
+    for i in range(n - 1, -1, -1):
+        if w >= weights[i] and dp[w] == dp[w - weights[i]] + values[i]:
+            selected_items.add(i)
+            w -= weights[i]
+
+    # 更新结果
+    for i, row in enumerate(result):
+        if i in selected_items and row[7] > 0:
+            row[6] = '转加班'
+        elif row[7] > 0:
+            row[6] = '转串休'
+
+    return result
 
 
 def dealdata(chunk, calendar):
@@ -192,30 +187,28 @@ def dealdata(chunk, calendar):
 
 
 def generate_summary_table(df):
-    # 创建数据透视表，列为日期，index 为姓名，values 为时长求和
-    pivot = df.pivot_table(index='姓名', columns='日报日期',
-                           values='时长', aggfunc='sum', fill_value=0)
-    # 添加合计列
-    pivot['合计'] = pivot.sum(axis=1)
-    # 重置索引
-    summary_df = pivot.reset_index()
-    return summary_df
+    # 使用 groupby 替代 pivot_table，性能更好
+    summary_df = df.groupby(['姓名', '日报日期'])['时长'].sum().unstack(fill_value=0)
+    summary_df['合计'] = summary_df.sum(axis=1)
+    return summary_df.reset_index()
 
 
 if __name__ == "__main__":
     start = time.perf_counter()
-    # 获得工作日和节假日
-    calendar = Crili(2025, 1).parseHTML()
-    df = pd.read_excel('计算结果.xlsx')
-    df['日报日期'] = df['日报日期'].dt.strftime('%Y%m%d')
-    datas = df.to_numpy()
-    sorted_indices = np.argsort(datas[:, 0])  # 获取排序索引
-    datas = datas[sorted_indices]  # 按索引重新排列数组
-    df = overtime_cal(datas, calendar)
-    summary_df = generate_summary_table(df)
-    # 多表导出到excel
-    with pd.ExcelWriter("site.xlsx") as writer:
-        df.to_excel(writer, index=False, sheet_name='明细', engine='openpyxl')
-        summary_df.to_excel(writer, index=False,
-                            sheet_name='汇总', engine='openpyxl')
+    with requests.Session() as session:
+        # 获得工作日和节假日
+        calendar = Crili(2025, 1).parseHTML()
+        df = pd.read_excel('计算结果.xlsx')
+        df['日报日期'] = df['日报日期'].dt.strftime('%Y%m%d')
+        datas = df.to_numpy()
+        sorted_indices = np.argsort(datas[:, 0])  # 获取排序索引
+        datas = datas[sorted_indices]  # 按索引重新排列数组
+        df = overtime_cal(datas, calendar)
+        summary_df = generate_summary_table(df)
+        # 多表导出到excel
+        with pd.ExcelWriter("site.xlsx") as writer:
+            df.to_excel(writer, index=False,
+                        sheet_name='明细', engine='openpyxl')
+            summary_df.to_excel(writer, index=False,
+                                sheet_name='汇总', engine='openpyxl')
     print("运行时间：", time.perf_counter() - start)
