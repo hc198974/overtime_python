@@ -173,6 +173,7 @@ class Cmacro:
         )
         wb.Close()
         print("END")
+        excel.Quit()
 
 
 def custom_gettime(df):
@@ -219,6 +220,7 @@ def custom_gettime(df):
     return df
 
 
+@run_time
 def getgroup(dict, group3, group2, group1):
     jiaban = []
     remainer = 36
@@ -305,6 +307,7 @@ def generate_summary_table(df):
 
 
 def main(result):
+    start = time.perf_counter()
     list = []
     # 读取Excel文件，默认第一个表《汇总表》
     df = pd.read_excel('计算结果.xlsx')
@@ -326,7 +329,7 @@ def main(result):
     # 新建一个pivot_table
     summary_df = generate_summary_table(df)
     # 多表导出到excel
-    start = time.perf_counter()
+
     with pd.ExcelWriter("site.xlsx") as writer:
         df.to_excel(writer, index=False, sheet_name='明细', engine='openpyxl')
         summary_df.to_excel(writer, index=False,

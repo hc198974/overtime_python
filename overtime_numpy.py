@@ -7,6 +7,9 @@ import time
 import functools
 import pandas as pd
 import numpy as np
+import tkinter
+import tkinter.simpledialog
+import win32com.client
 
 
 def run_time(fn):  # 用于测试方法运行时间的装饰器
@@ -17,6 +20,101 @@ def run_time(fn):  # 用于测试方法运行时间的装饰器
         print('%s 运行了 %f 秒' % (fn, time.perf_counter() - start))
         return res
     return wrapper
+
+
+class Cwindow(object):
+    def __init__(self):
+        self.month = datetime.datetime.now().month - 1
+
+    def set_win_center(self, root, curWidth="", curHight=""):
+        """
+        设置窗口大小，并居中显示
+        param root:主窗体实例
+        param curWidth:窗口宽度，非必填，默认200
+        return:无
+        """
+        if not curWidth:
+            """获取窗口宽度，默认200"""
+            curWidth = root.winfo_width()
+        if not curHight:
+            """获取窗口高度，默认200"""
+            curHight = root.winfo_height()
+
+        # 获取屏幕宽度和高度
+        scn_w, scn_h = root.maxsize()
+
+        # 计算中心坐标
+        cen_x = (scn_w - curWidth) / 2
+        cen_y = (scn_h - curHight) / 2
+
+        # 设置窗口初始大小和位置
+        size_xy = "%dx%d+%d+%d" % (curWidth, curHight, cen_x, cen_y)
+        root.geometry(size_xy)
+
+    def askName(self):
+        # 获取字符串（标题，提示，初始值）
+        name = tkinter.simpledialog.askstring(
+            title="获取信息", prompt="请输入姓名：", initialvalue="韩超"
+        )
+        self.name = name
+
+    def askMonth(self):
+        month = tkinter.simpledialog.askinteger(
+            title="获取月份",
+            prompt="请输入月份",
+            initialvalue=datetime.datetime.now().month - 1,
+        )
+        self.month = month
+
+    def dealSheet(self):
+        # 对汇总表数据进行处理
+        Cmacro().dealData()
+
+    def shutDown(self):
+        root.destroy()
+
+    def createWindow(self):
+        global root
+        # 创建主窗口
+        root = tkinter.Tk()
+        # 设置窗口大小
+        root.resizable(False, False)
+        root.title("加班")
+        root.update()
+        self.set_win_center(root, 300, 150)
+        # 添加按钮
+        # btn1 = tkinter.Button(root, text='获取用户名', command=self.askName)
+        # btn1.pack(expand='yes')
+        btn2 = tkinter.Button(root, text="获取月份", command=self.askMonth)
+        btn2.pack(expand="yes")
+        btn4 = tkinter.Button(root, text="处理数据", command=self.dealSheet)
+        btn4.pack(expand="yes")
+        btn3 = tkinter.Button(root, text="开始计算", command=self.shutDown)
+        btn3.pack(expand="yes")
+        # 加入消息循环
+        root.mainloop()
+
+
+class Cmacro:
+    def __init__(self) -> None:
+        self.path = (
+            r"c:\Users\Administrator\Documents\GitHub\overtime_python\原始数据.xlsm"
+        )
+
+    def dealData(self):
+        excel = win32com.client.Dispatch("Excel.Application")
+        excel.Visible = True
+        wb = excel.Workbooks.Open(self.path)
+        print("START")
+        excel.Application.Run("deleteRow")
+        wb.SaveAs(
+            r"c:\Users\Administrator\Documents\GitHub\overtime_python\计算结果.xlsx",
+            FileFormat=51,
+            ConflictResolution=2,
+        )
+        wb.Close()
+        print("END")
+        excel.Quit()
 
 
 class Crili(object):
@@ -77,14 +175,12 @@ class Crili(object):
         return result
 
 
-@run_time
 def overtime_cal(datas, result):
     """加班计算"""
     modified_chunk = []
     for i in range(len(datas)//len(result)):
         chunk = datas[i*len(result):(i*len(result))+(len(result)-1)]
         chunk = dealdata(chunk, result)
-        # print(chunk)
         chunk = maximize_value(chunk)
         modified_chunk.append(chunk)
 
@@ -195,9 +291,11 @@ def generate_summary_table(df):
 
 if __name__ == "__main__":
     start = time.perf_counter()
+    cw = Cwindow()
+    cw.createWindow()
     with requests.Session() as session:
         # 获得工作日和节假日
-        calendar = Crili(2025, 1).parseHTML()
+        calendar = Crili(2025, cw.month).parseHTML()
         df = pd.read_excel('计算结果.xlsx')
         df['日报日期'] = df['日报日期'].dt.strftime('%Y%m%d')
         datas = df.to_numpy()

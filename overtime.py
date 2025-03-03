@@ -175,6 +175,7 @@ class Cmacro:
         )
         wb.Close()
         print("END")
+        excel.Quit()
 
 
 class Count(object):
@@ -384,12 +385,6 @@ class Count(object):
         else:
             self.cash = self.dict.copy()
 
-        # print("总数据一览：", self.dict)
-        # print("加班数合计：", round(sum(list(self.dcit.values())), 2))
-        # print("转加班小时：", round(sum(list(self.cash.values())), 2))
-        # print("转串休小时：", round(sum(list(chuanxiu.values())), 2))
-        # print("转加班费：", sorted(self.cash.keys()))
-        # print("转串休假：", sorted(chuanxiu.keys()))
         self.setContents()
 
     def jiSuan(self):
