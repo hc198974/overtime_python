@@ -51,6 +51,28 @@ def custom_gettime(df):
 
 
 def getgroup(dict, group3, group2, group1):
+    def get_start(array,remainer):
+        i=1
+        s=0
+        while True:
+            if sum(array[:i][::1]) >= remainer and i<=len(array):
+                s=i-1
+                break
+            else:
+                i+=1
+        return s
+
+    def get_end(array,remainer):
+        i=1
+        s=0
+        while True:
+            if sum(array[:i][::-1]) >= remainer and i<=len(array):
+                s=i
+                break
+            else:
+                i+=1
+        return s
+
     jiaban = []
     remainer = 36
     if not group3.empty:
@@ -64,12 +86,16 @@ def getgroup(dict, group3, group2, group1):
             remainer = remainer - group2['时长'].sum()
         else:
             coms = []
-            for i in range(len(group2.loc[group2['时长'] != 0, ['时长']])):
+            array=sorted(group2.loc[group2['时长'] > 0,'时长'].tolist(),reverse=True)            
+            array_start = get_start(array,remainer)
+            array_end = get_end(array,remainer)
+            for i in range(array_start,array_end):
                 combinations = list(
-                    itertools.combinations(list(group2[group2['时长'] != 0].index), i+1))
+                    itertools.combinations(list(group2[group2['时长'] != 0].index), i))
                 coms.append(combinations)
 
             max = 0
+            
             # coms范例：[[(247,), (255,), (261,)], [(247, 255), (247, 261), (255, 261)], [(247, 255, 261)]]
             tuples = [t for sublist in coms for t in sublist]
             for indexes in tuples:
@@ -89,9 +115,11 @@ def getgroup(dict, group3, group2, group1):
             remainer = remainer - group1['时长'].sum()
         else:
             coms = []
-            for i in range(len(group1)):
-                combinations = list(
-                    itertools.combinations(list(group1.index), i+1))
+            array=sorted(group1.loc[group1['时长'] > 0,'时长'].tolist(),reverse=True)            
+            array_start = get_start(array,remainer)
+            array_end = get_end(array,remainer)
+            for i in range(array_start,array_end):
+                combinations = list(itertools.combinations(list(group1.index), i))
                 coms.append(combinations)
             # coms范例：[[(247,), (255,), (261,)], [(247, 255), (247, 261), (255, 261)], [(247, 255, 261)]]
             max = 0
