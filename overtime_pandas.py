@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-import datetime
 import itertools
-import time
 import pandas as pd
 from demos import *
 
@@ -25,11 +23,12 @@ def custom_gettime(df):
         if row['节假日'] == 1.5:
             if xb >= sb and sb <= temp17:
                 if xb >= temp18:
-                    return round((datetime.datetime.combine(datetime.date.today(), xb) - datetime.datetime.combine(datetime.date.today(), temp17)).seconds / 3600, 2)
+                    return round((datetime.datetime.combine(datetime.date.today(), xb) - datetime.datetime.combine(
+                        datetime.date.today(), temp17)).seconds / 3600, 2)
             return 0
         else:
             delta = round((datetime.datetime.combine(datetime.date.today(
-            ), xb) - datetime.datetime.combine(datetime.date.today(), sb)).seconds/3600, 2)
+            ), xb) - datetime.datetime.combine(datetime.date.today(), sb)).seconds / 3600, 2)
             if delta > 0.5:
                 if sb < temp8:
                     sb = temp8
@@ -39,11 +38,11 @@ def custom_gettime(df):
                     xb = temp13
                 # 计算加班时间
                 delta = round((datetime.datetime.combine(datetime.date.today(
-                ), xb) - datetime.datetime.combine(datetime.date.today(), sb)).seconds/3600, 2)
+                ), xb) - datetime.datetime.combine(datetime.date.today(), sb)).seconds / 3600, 2)
                 if xb >= temp13 and sb <= temp12:
-                    return delta-1.5
+                    return delta - 1.5
                 else:
-                    return delta-0.5
+                    return delta - 0.5
             return 0
 
     df['时长'] = df.apply(calculate_time, axis=1)
@@ -51,26 +50,26 @@ def custom_gettime(df):
 
 
 def getgroup(dict, group3, group2, group1):
-    def get_start(array,remainer):
-        i=1
-        s=0
-        while True:
-            if sum(array[:i][::1]) >= remainer and i<=len(array):
-                s=i-1
+    def get_start(array, remainer):
+        i = 1
+        s = 0
+        while i <= len(array):
+            if sum(array[:i][::1]) >= remainer:
+                s = i - 1
                 break
             else:
-                i+=1
+                i += 1
         return s
 
-    def get_end(array,remainer):
-        i=1
-        s=0
-        while True:
-            if sum(array[:i][::-1]) >= remainer and i<=len(array):
-                s=i
+    def get_end(array, remainer):
+        i = 1
+        s = 0
+        while i <= len(array):
+            if sum(array[:i][::-1]) >= remainer:
+                s = i
                 break
             else:
-                i+=1
+                i += 1
         return s
 
     jiaban = []
@@ -86,16 +85,16 @@ def getgroup(dict, group3, group2, group1):
             remainer = remainer - group2['时长'].sum()
         else:
             coms = []
-            array=sorted(group2.loc[group2['时长'] > 0,'时长'].tolist(),reverse=True)            
-            array_start = get_start(array,remainer)
-            array_end = get_end(array,remainer)
-            for i in range(array_start,array_end):
+            array = sorted(group2.loc[group2['时长'] > 0, '时长'].tolist(), reverse=True)
+            array_start = get_start(array, remainer)
+            array_end = get_end(array, remainer)
+            for i in range(array_start, array_end):
                 combinations = list(
                     itertools.combinations(list(group2[group2['时长'] != 0].index), i))
                 coms.append(combinations)
 
             max = 0
-            
+
             # coms范例：[[(247,), (255,), (261,)], [(247, 255), (247, 261), (255, 261)], [(247, 255, 261)]]
             tuples = [t for sublist in coms for t in sublist]
             for indexes in tuples:
@@ -115,10 +114,10 @@ def getgroup(dict, group3, group2, group1):
             remainer = remainer - group1['时长'].sum()
         else:
             coms = []
-            array=sorted(group1.loc[group1['时长'] > 0,'时长'].tolist(),reverse=True)            
-            array_start = get_start(array,remainer)
-            array_end = get_end(array,remainer)
-            for i in range(array_start,array_end):
+            array = sorted(group1.loc[group1['时长'] > 0, '时长'].tolist(), reverse=True)
+            array_start = get_start(array, remainer)
+            array_end = get_end(array, remainer)
+            for i in range(array_start, array_end):
                 combinations = list(itertools.combinations(list(group1.index), i))
                 coms.append(combinations)
             # coms范例：[[(247,), (255,), (261,)], [(247, 255), (247, 261), (255, 261)], [(247, 255, 261)]]
@@ -192,7 +191,7 @@ def main(calendars):
         df.to_excel(writer, index=False, sheet_name='明细', engine='openpyxl')
         summary_df.to_excel(writer, index=False,
                             sheet_name='汇总', engine='openpyxl')
-    print("时间：", time.perf_counter()-start)
+    print("时间：", time.perf_counter() - start)
 
 
 if __name__ == "__main__":

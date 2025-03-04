@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-import datetime
 import itertools
 from openpyxl import load_workbook
-import time
 from demos import *
+
 
 class Count(object):
     def __init__(self, names, month, result, wb):
@@ -55,10 +54,10 @@ class Count(object):
                         time1 = x[2].value
                         time2 = x[3].value
                         if (
-                            time1 != ""
-                            and time2 != ""
-                            and time1 is not None
-                            and time2 is not None
+                                time1 != ""
+                                and time2 != ""
+                                and time1 is not None
+                                and time2 is not None
                         ):
                             if type(time1) == str:
                                 time1 = datetime.datetime.strptime(
@@ -107,21 +106,21 @@ class Count(object):
 
                                     if time2 <= temp12:
                                         self.hour = (
-                                            time2 - time1 -
-                                            datetime.timedelta(hours=0.5)
+                                                time2 - time1 -
+                                                datetime.timedelta(hours=0.5)
                                         )
                                     if time2 >= temp13:
                                         if time1 <= temp12:
                                             self.hour = (
-                                                time2
-                                                - time1
-                                                - datetime.timedelta(hours=1.5)
+                                                    time2
+                                                    - time1
+                                                    - datetime.timedelta(hours=1.5)
                                             )
                                         else:
                                             self.hour = (
-                                                time2
-                                                - time1
-                                                - datetime.timedelta(hours=0.5)
+                                                    time2
+                                                    - time1
+                                                    - datetime.timedelta(hours=0.5)
                                             )
 
                                     if self.hour.days == 0:
@@ -139,7 +138,6 @@ class Count(object):
 
     def setContents(self):
         # 在中干表写入是转加班费还是串休
-
         for x in self.ws.rows:
             if not x[7].value is None:
                 if x[0].value == self.name.value and x[7].value > 0:
@@ -159,12 +157,34 @@ class Count(object):
         self.ws2.cell(row=self.name.row, column=34).value = sum(
             list(self.dict.values()))
         self.ws2.cell(row=self.name.row, column=35).value = sum(
-            list(self.dict.values()))-sum(list(self.cash.values()))
+            list(self.dict.values())) - sum(list(self.cash.values()))
 
     # @run_time
     def count2name(self):
-        global textname
-        textname = self.name.value
+        def get_dict_start(pdict, remainer):
+            array = sorted(list(pdict.values()), reverse=True)
+            i = 1
+            s = len(array)
+            while i <= len(array):
+                if sum(array[:i]) >= remainer:
+                    s = i - 1
+                    break
+                else:
+                    i += 1
+            return s
+
+        def get_dict_end(pdict, remainer):
+            array = sorted(list(pdict.values()), reverse=False)
+            i = 1
+            s = len(array) + 1
+            while i <= len(array):
+                if sum(array[:i]) >= remainer:
+                    s = i
+                    break
+                else:
+                    i += 1
+            return s
+
         self.cash.clear()
         self.dict = self.dictall.get(self.name.value)
         dict_1, dict_2, dict_3 = {}, {}, {}
@@ -181,7 +201,9 @@ class Count(object):
             for p in [dict_3, dict_2, dict_1]:
                 if len(p) > 0:
                     combine = []
-                    for r in range(1, len(p) + 1):
+                    dict_start = get_dict_start(p, remainder)
+                    dict_end = get_dict_end(p, remainder)
+                    for r in range(dict_start, dict_end):
                         combinations = list(itertools.combinations(p, r))
                         for x in combinations:
                             combine.append(x)
@@ -206,7 +228,7 @@ class Count(object):
                             total = 0
 
                     self.cash.update(temp)
-                    temp.clear
+                    temp.clear()
                     remainder = remainder - sum(list(self.cash.values()))
 
         else:
