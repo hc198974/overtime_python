@@ -24,6 +24,22 @@ class Count(object):
         self.hour = 0
         self.result = result
 
+    def format_date(self, value):
+        """将日期值统一格式化为%Y%m%d字符串"""
+        if isinstance(value, datetime.datetime):
+            return value.strftime("%Y%m%d")
+        elif isinstance(value, str):
+            # 尝试解析常见日期字符串格式
+            for fmt in ["%Y-%m-%d", "%Y/%m/%d", "%Y%m%d"]:
+                try:
+                    return datetime.datetime.strptime(value, fmt).strftime("%Y%m%d")
+                except ValueError:
+                    continue
+            # 如果所有格式都解析失败，返回原始值
+            return value
+        else:
+            return ""
+
     def getUrl(self):
         try:
             for m in self.result:
@@ -38,11 +54,11 @@ class Count(object):
 
     # 调整表里的加班小时数
     def changeHour(self):
-        temp17 = datetime.datetime.strptime("17:30", "%H:%M")
-        temp18 = datetime.datetime.strptime("18:00", "%H:%M")
-        temp12 = datetime.datetime.strptime("12:00", "%H:%M")
-        temp13 = datetime.datetime.strptime("13:00", "%H:%M")
-        temp8 = datetime.datetime.strptime("8:00", "%H:%M")
+        temp17 = datetime.datetime.strptime("17:30:00", "%H:%M:%S")
+        temp18 = datetime.datetime.strptime("18:00:00", "%H:%M:%S")
+        temp12 = datetime.datetime.strptime("12:00:00", "%H:%M:%S")
+        temp13 = datetime.datetime.strptime("13:00:00", "%H:%M:%S")
+        temp8 = datetime.datetime.strptime("8:00:00", "%H:%M:%S")
         self.getUrl()
 
         for name in self.names:
@@ -50,7 +66,7 @@ class Count(object):
             for x in self.ws.rows:
                 if x[4].value == self.month:
                     if x[0].value == name.value:
-                        temp = x[1].value.strftime("%Y%m%d")
+                        temp = self.format_date(x[1].value)
                         time1 = x[2].value
                         time2 = x[3].value
                         if (
@@ -61,17 +77,18 @@ class Count(object):
                         ):
                             if type(time1) == str:
                                 time1 = datetime.datetime.strptime(
-                                    time1, "%H:%M")
+                                    time1, "%H:%M:%S")
                             elif type(time1) == datetime.time:
                                 time1 = datetime.datetime.strptime(
-                                    (time1.strftime("%H:%M")), "%H:%M"
+                                    (time1.strftime("%H:%M:%S")), "%H:%M:%S"
+
                                 )  # 先把datetime.time格式转换为str再转换为datetime.datetime
                             if type(time2) == str:
                                 time2 = datetime.datetime.strptime(
-                                    time2, "%H:%M")
+                                    time2, "%H:%M:%S")
                             elif type(time2) == datetime.time:
                                 time2 = datetime.datetime.strptime(
-                                    (time2.strftime("%H:%M")), "%H:%M"
+                                    (time2.strftime("%H:%M:%S")), "%H:%M:%S"
                                 )
 
                             if time2 > time1:
@@ -82,7 +99,7 @@ class Count(object):
 
                                 if self.hour > 0:
                                     x[7].value = round(self.hour / 3600, 2)
-                                    s = x[1].value.strftime("%Y%m%d")
+                                    s = self.format_date(x[1].value)
                                     dict[s] = x[7].value
                                     x[5].value = "工作日"
                                     self.hour = 0
@@ -106,27 +123,27 @@ class Count(object):
 
                                     if time2 <= temp12:
                                         self.hour = (
-                                                time2 - time1 -
-                                                datetime.timedelta(hours=0.5)
+                                            time2 - time1 -
+                                            datetime.timedelta(hours=0.5)
                                         )
                                     if time2 >= temp13:
                                         if time1 <= temp12:
                                             self.hour = (
-                                                    time2
-                                                    - time1
-                                                    - datetime.timedelta(hours=1.5)
+                                                time2
+                                                - time1
+                                                - datetime.timedelta(hours=1.5)
                                             )
                                         else:
                                             self.hour = (
-                                                    time2
-                                                    - time1
-                                                    - datetime.timedelta(hours=0.5)
+                                                time2
+                                                - time1
+                                                - datetime.timedelta(hours=0.5)
                                             )
 
                                     if self.hour.days == 0:
                                         x[7].value = round(
                                             self.hour.seconds / 3600, 2)
-                                        s = x[1].value.strftime("%Y%m%d")
+                                        s = self.format_date(x[1].value)
                                         dict[s] = x[7].value
                                         x[5].value = "节假日"
                                         self.hour = 0
@@ -141,7 +158,7 @@ class Count(object):
         for x in self.ws.rows:
             if not x[7].value is None:
                 if x[0].value == self.name.value and x[7].value > 0:
-                    if x[1].value.strftime("%Y%m%d") in self.cash.keys():
+                    if self.format_date(x[1].value) in self.cash.keys():
                         x[6].value = "转加班费"
                     else:
                         x[6].value = "转串休"
@@ -252,9 +269,9 @@ class Count(object):
 if __name__ == "__main__":
     cw = Cwindow()
     cw.createWindow()
-    start = time.perf_counter()
     # 获得工作日和节假日
     result = Crili(2025, cw.month).parseHTML()
+    start = time.perf_counter()
     wb = load_workbook(filename="计算结果.xlsx")
     ws = wb["中干"]
     names = []
@@ -266,5 +283,6 @@ if __name__ == "__main__":
                 break
     ji = Count(names, cw.month, result, wb)
     ji.jiSuan()
-    wb.save("site.xlsx")
+    wb.save("计算结果.xlsx")
+
     print("运行时间：", time.perf_counter() - start)

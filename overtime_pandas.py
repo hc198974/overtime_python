@@ -5,11 +5,11 @@ from demos import *
 
 
 def custom_gettime(df):
-    temp17 = datetime.datetime.strptime("17:30", "%H:%M").time()
-    temp18 = datetime.datetime.strptime("18:00", "%H:%M").time()
-    temp12 = datetime.datetime.strptime("12:00", "%H:%M").time()
-    temp13 = datetime.datetime.strptime("13:00", "%H:%M").time()
-    temp8 = datetime.datetime.strptime("8:00", "%H:%M").time()
+    temp17 = datetime.datetime.strptime("17:30:00", "%H:%M:%S").time()
+    temp18 = datetime.datetime.strptime("18:00:00", "%H:%M:%S").time()
+    temp12 = datetime.datetime.strptime("12:00:00", "%H:%M:%S").time()
+    temp13 = datetime.datetime.strptime("13:00:00", "%H:%M:%S").time()
+    temp8 = datetime.datetime.strptime("8:00:00", "%H:%M:%S").time()
 
     def calculate_time(row):
         sb = row['上班时间']
@@ -17,9 +17,10 @@ def custom_gettime(df):
         if pd.isna(sb) or pd.isna(xb):
             return 0
         if isinstance(sb, str):
-            sb = datetime.datetime.strptime(sb, "%H:%M").time()
+            sb = datetime.datetime.strptime(sb, "%H:%M:%S").time()
         if isinstance(xb, str):
-            xb = datetime.datetime.strptime(xb, "%H:%M").time()
+            xb = datetime.datetime.strptime(xb, "%H:%M:%S").time()
+
         if row['节假日'] == 1.5:
             if xb >= sb and sb <= temp17:
                 if xb >= temp18:
@@ -85,7 +86,8 @@ def getgroup(dict, group3, group2, group1):
             remainer = remainer - group2['时长'].sum()
         else:
             coms = []
-            array = sorted(group2.loc[group2['时长'] > 0, '时长'].tolist(), reverse=True)
+            array = sorted(
+                group2.loc[group2['时长'] > 0, '时长'].tolist(), reverse=True)
             array_start = get_start(array, remainer)
             array_end = get_end(array, remainer)
             for i in range(array_start, array_end):
@@ -114,11 +116,13 @@ def getgroup(dict, group3, group2, group1):
             remainer = remainer - group1['时长'].sum()
         else:
             coms = []
-            array = sorted(group1.loc[group1['时长'] > 0, '时长'].tolist(), reverse=True)
+            array = sorted(
+                group1.loc[group1['时长'] > 0, '时长'].tolist(), reverse=True)
             array_start = get_start(array, remainer)
             array_end = get_end(array, remainer)
             for i in range(array_start, array_end):
-                combinations = list(itertools.combinations(list(group1.index), i))
+                combinations = list(
+                    itertools.combinations(list(group1.index), i))
                 coms.append(combinations)
             # coms范例：[[(247,), (255,), (261,)], [(247, 255), (247, 261), (255, 261)], [(247, 255, 261)]]
             max = 0
@@ -166,7 +170,7 @@ def main(calendars):
     start = time.perf_counter()
     list = []
     # 读取Excel文件，默认第一个表《汇总表》
-    df = pd.read_excel('计算结果.xlsx')
+    df = pd.read_excel('计算结果.xlsx', parse_dates=['日报日期'])
     df['日报日期'] = df['日报日期'].dt.strftime('%Y%m%d')
     df.drop('节假日', axis=1, inplace=True)
     calendars_df = pd.DataFrame(calendars.items(), columns=['日报日期', '节假日'])
@@ -187,7 +191,7 @@ def main(calendars):
     summary_df = generate_summary_table(df)
     # 多表导出到excel
 
-    with pd.ExcelWriter("site.xlsx") as writer:
+    with pd.ExcelWriter("计算结果.xlsx") as writer:
         df.to_excel(writer, index=False, sheet_name='明细', engine='openpyxl')
         summary_df.to_excel(writer, index=False,
                             sheet_name='汇总', engine='openpyxl')

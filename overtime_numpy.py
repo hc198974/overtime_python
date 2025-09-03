@@ -66,18 +66,18 @@ def maximize_value(result, max_sum=36000):
 
 def dealdata(chunk, calendar):
     def calculate_time(sb, xb, isweekend):
-        temp17 = datetime.datetime.strptime("17:30", "%H:%M").time()
-        temp18 = datetime.datetime.strptime("18:00", "%H:%M").time()
-        temp12 = datetime.datetime.strptime("12:00", "%H:%M").time()
-        temp13 = datetime.datetime.strptime("13:00", "%H:%M").time()
-        temp8 = datetime.datetime.strptime("8:00", "%H:%M").time()
+        temp17 = datetime.datetime.strptime("17:30:00", "%H:%M:%S").time()
+        temp18 = datetime.datetime.strptime("18:00:00", "%H:%M:%S").time()
+        temp12 = datetime.datetime.strptime("12:00:00", "%H:%M:%S").time()
+        temp13 = datetime.datetime.strptime("13:00:00", "%H:%M:%S").time()
+        temp8 = datetime.datetime.strptime("8:00:00", "%H:%M:%S").time()
 
         if pd.isna(sb) or pd.isna(xb):
             return 0
         if isinstance(sb, str):
-            sb = datetime.datetime.strptime(sb, "%H:%M").time()
+            sb = datetime.datetime.strptime(sb, "%H:%M:%S").time()
         if isinstance(xb, str):
-            xb = datetime.datetime.strptime(xb, "%H:%M").time()
+            xb = datetime.datetime.strptime(xb, "%H:%M:%S").time()
         if isweekend == 1.5:
             if xb >= sb and sb <= temp17:
                 if xb >= temp18:
@@ -121,13 +121,14 @@ def generate_summary_table(df):
 
 
 if __name__ == "__main__":
-    start = time.perf_counter()
     cw = Cwindow()
     cw.createWindow()
     with requests.Session() as session:
         # 获得工作日和节假日
         calendar = Crili(2025, cw.month).parseHTML()
-        df = pd.read_excel('计算结果.xlsx')
+        start = time.perf_counter()
+        df = pd.read_excel('计算结果.xlsx', parse_dates=['日报日期'])
+
         df['日报日期'] = df['日报日期'].dt.strftime('%Y%m%d')
         datas = df.to_numpy()
         sorted_indices = np.argsort(datas[:, 0])  # 获取排序索引
@@ -135,7 +136,7 @@ if __name__ == "__main__":
         df = overtime_cal(datas, calendar)
         summary_df = generate_summary_table(df)
         # 多表导出到excel
-        with pd.ExcelWriter("site.xlsx") as writer:
+        with pd.ExcelWriter("计算结果.xlsx") as writer:
             df.to_excel(writer, index=False,
                         sheet_name='明细', engine='openpyxl')
             summary_df.to_excel(writer, index=False,
