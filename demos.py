@@ -8,6 +8,7 @@ from lxml import etree
 import win32com.client
 import time
 import functools
+import os
 
 
 def run_time(fn):  # 用于测试方法运行时间的装饰器
@@ -48,6 +49,22 @@ class Crili(object):
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
         }
         result = {}
+        # 2026年法定节假日列表，改年份同样得改
+        holiday_3x = [
+            "20260101",
+            "20260215",
+            "20260216",
+            "20260217",
+            "20260218",
+            "20260405",
+            "20260501",
+            "20260502",
+            "20260619",
+            "20260925",
+            "20261001",
+            "20261002",
+            "20261003"
+        ]
 
         c = calendar.monthrange(self.year, self.month)[1]
         s = requests.session()
@@ -63,7 +80,7 @@ class Crili(object):
                 if "class" in item:
                     temp = datetime.datetime(self.year, self.month, i + 1)
                     if item["class"] == "wnrl_riqi_xiu":
-                        weekday = 3
+                        weekday = 2
                     elif item["class"] == "wnrl_riqi_mo":
                         weekday = 2
                     elif item["class"] == "wnrl_riqi_ban":
@@ -76,12 +93,17 @@ class Crili(object):
                         weekday = 1.5
 
                 result[temp.strftime("%Y%m%d")] = weekday
+
+        # 如果某天属于法定节假日（holiday_3x），强制设置为 3 倍
+        result.update({k: 3 for k in holiday_3x if k in result})
+
         return result
 
 
 class Cwindow(object):
     def __init__(self):
         self.month = datetime.datetime.now().month - 1
+        self.start_calculation = False
 
     def set_win_center(self, root, curWidth="", curHight=""):
         """
@@ -128,6 +150,10 @@ class Cwindow(object):
         Cmacro().dealData()
 
     def shutDown(self):
+        self.start_calculation = True
+        root.destroy()
+
+    def on_close(self):
         root.destroy()
 
     def createWindow(self):
@@ -148,15 +174,16 @@ class Cwindow(object):
         btn4.pack(expand="yes")
         btn3 = tkinter.Button(root, text="开始计算", command=self.shutDown)
         btn3.pack(expand="yes")
+        root.protocol("WM_DELETE_WINDOW", self.on_close)
         # 加入消息循环
         root.mainloop()
+        return self.start_calculation
 
 
 class Cmacro:
     def __init__(self) -> None:
-        self.path = (
-            r"c:\Users\Administrator\Documents\GitHub\overtime_python\原始数据.xlsm"
-        )
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        self.path = os.path.join(script_dir, r"原始数据.xlsm")
 
     def dealData(self):
         excel = win32com.client.Dispatch("Excel.Application")
@@ -164,8 +191,10 @@ class Cmacro:
         wb = excel.Workbooks.Open(self.path)
         print("START")
         excel.Application.Run("deleteRow")
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        save_path = os.path.join(script_dir, "计算结果.xlsx")
         wb.SaveAs(
-            r"c:\Users\Administrator\Documents\GitHub\overtime_python\计算结果.xlsx",
+            save_path,
             FileFormat=51,
             ConflictResolution=2,
         )
@@ -175,10 +204,10 @@ class Cmacro:
 
 
 class Ccal:
-    def __init__(self,year,month):
+    def __init__(self, year, month):
         self.year = year
         self.month = month
-        
+
     def get_current_month_holidays(self):
         url = f"https://timor.tech/api/holiday/year/{self.year}"
         headers = {
