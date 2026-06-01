@@ -422,13 +422,21 @@ class Count(object):
                             if self.result.get(date_key) == 3
                         ), 2),
                     )
+                    # 写入串休扣除数
+                    # 从统计表中汇总该 id 在本月的串休扣除（统计表第10列，索引9）并写入明细表第9列
+                    rest_sum = sum(
+                        (r[10].value if r[10].value is not None else 0)
+                        for r in self.ws1.rows
+                        if r[5].value == self.month and r[1].value == cell.value
+                    )
+                    ws3.cell(row=cell.row, column=9, value=rest_sum)
 
                     # 写入扣除串休后计入加班费的小时数
                     fee_dict = self.cash.get(cell.value, {})
                     # 小计
                     ws3.cell(
                         row=cell.row,
-                        column=9,
+                        column=10,
                         value=round(sum(
                             hours for date_key, hours in fee_dict.items()
                         ), 2),
@@ -436,7 +444,7 @@ class Count(object):
                     # 工作日扣除串休后计入加班费的小时数
                     ws3.cell(
                         row=cell.row,
-                        column=10,
+                        column=11,
                         value=round(
                             sum(
                                 hours
@@ -449,7 +457,7 @@ class Count(object):
                     # 公休日扣除串休后计入加班费的小时数
                     ws3.cell(
                         row=cell.row,
-                        column=11,
+                        column=12,
                         value=round(
                             sum(
                                 hours
@@ -462,7 +470,7 @@ class Count(object):
                     # 节假日扣除串休后计入加班费的小时数
                     ws3.cell(
                         row=cell.row,
-                        column=12,
+                        column=13,
                         value=round(
                             sum(
                                 hours
@@ -480,7 +488,7 @@ class Count(object):
                     if cell.value not in self.night_num:
                         ws3.cell(
                             row=cell.row,
-                            column=15,
+                            column=16,
                             value=round(
                                 sum(
                                     hours
@@ -494,7 +502,7 @@ class Count(object):
                     else:
                         ws3.cell(
                             row=cell.row,
-                            column=15,
+                            column=16,
                             value=round(
                                 sum(
                                     hours
@@ -510,7 +518,7 @@ class Count(object):
                     if cell.value not in self.night_num:
                         ws3.cell(
                             row=cell.row,
-                            column=16,
+                            column=17,
                             value=round(
                                 sum(
                                     hours
@@ -524,7 +532,7 @@ class Count(object):
                     else:
                         ws3.cell(
                             row=cell.row,
-                            column=16,
+                            column=17,
                             value=round(
                                 sum(
                                     hours
@@ -540,7 +548,7 @@ class Count(object):
                     if cell.value not in self.night_num:
                         ws3.cell(
                             row=cell.row,
-                            column=17,
+                            column=18,
                             value=round(
                                 sum(
                                     hours
@@ -554,7 +562,7 @@ class Count(object):
                     else:
                         ws3.cell(
                             row=cell.row,
-                            column=17,
+                            column=18,
                             value=round(
                                 sum(
                                     hours
