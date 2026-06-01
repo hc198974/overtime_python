@@ -98,6 +98,7 @@ class Count(object):
                                 sorted_special_dict[key] = value + \
                                     (hour, '工作日')
                                 temp_dict[key] = hour
+                                self.dictall[id.value] = temp_dict
 
                         if key in self.weekday.keys() or key in self.holiday.keys():
                             if end > start:
@@ -124,6 +125,7 @@ class Count(object):
                                     sorted_special_dict[key] = value + \
                                         (hour, '公休日')
                                     temp_dict[key] = hour
+                                    self.dictall[id.value] = temp_dict
                                 elif self.result.get(key) == 3:
                                     sorted_special_dict[key] = value + \
                                         (hour, '节假日')
@@ -310,17 +312,18 @@ class Count(object):
         # 在这里减掉串休使用的小时数
         self.dictfee = copy.deepcopy(self.dictall)
         for row in self.ws1.rows:
-            if row[5].value == self.month and row[9].value is not None:
+            if row[5].value == self.month and row[10].value is not None:
                 s = self.format_date(row[2].value)
                 if s in self.dictfee.get(row[1].value, {}):
-                    if row[9].value > 0:
-                        row[9].value = -1*row[9].value
-                    self.dictfee[row[1].value][s] += row[9].value
+                    if row[10].value > 0:
+                        row[10].value = -1*row[10].value
+                    self.dictfee[row[1].value][s] += row[10].value
 
         for id in self.ids:
             # 数据量不大，使用多进程开销大，多线程容易出现错误
             self.id = id
             category_order = {3: 0, 2: 1, 1.5: 2}
+            
             sorted_dict = dict(
                 sorted(
                     self.dictfee.get(self.id.value, {}).items(),
