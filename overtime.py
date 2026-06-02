@@ -270,7 +270,7 @@ if __name__ == "__main__":
     cw = Cwindow()
     cw.createWindow()
     # 获得工作日和节假日
-    result = Crili(2025, cw.month).parseHTML()
+    result = Crili(2026, cw.month).parseHTML()
     start = time.perf_counter()
     wb = load_workbook(filename="计算结果.xlsx")
     ws = wb["中干"]
