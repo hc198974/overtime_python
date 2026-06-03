@@ -202,6 +202,8 @@ class Cmacro:
         print("END")
         excel.Quit()
 
+# 这是用来获得当月节假日（wage=3）的类，接口来自 timor.tech
+
 
 class Ccal:
     def __init__(self, year, month):
@@ -219,7 +221,7 @@ class Ccal:
             holidays = []
             for date, info in data["holiday"].items():
                 # 检查日期是否为当前月份
-                if int(date.split("-")[0]) == self.month and info["holiday"]:
+                if int(date.split("-")[0]) == self.month and info["wage"] == 3:
                     holidays.append(date)
             return holidays
         except requests.RequestException as e:
