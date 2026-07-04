@@ -210,7 +210,7 @@ class Count_criterion(object):
                                 temp_dict[key2] = hour
                                 self.dictall[id.value] = {
                                     k: round(v, 2) for k, v in temp_dict.items()}
-
+            
             for m in self.ws1.rows:
                 if m[5].value == self.month:
                     if m[1].value == id.value:
@@ -219,6 +219,15 @@ class Count_criterion(object):
                             if len(sorted_criterion_dict[s]) == 4:
                                 m[8].value = sorted_criterion_dict[s][2]
                                 m[6].value = sorted_criterion_dict[s][3]
+
+                        # 孔祥雨特殊处理，后续删除
+                        if id.value=="Q5756":                            
+                            if s == "20260625":
+                                self.dictall[id.value][s] = 15
+                                m[8].value = 15
+                            if s == "20260626":
+                                self.dictall[id.value][s] = 8
+                                m[8].value = 8
 
     def writeRecordsSheet(self):
         # 清空记录表

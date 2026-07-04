@@ -219,6 +219,7 @@ class App:
 
             wb.save(excel_path)
             wb.close()
+            self.entry_hours.delete(0, tk.END)
             messagebox.showinfo(
                 "成功", f"已成功使用 {used_total:.2f} 小时加班时长抵扣串休。\n请检查统计表 K 列。")
         except Exception as e:
