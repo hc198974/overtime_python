@@ -29,6 +29,8 @@ class Count_criterion(object):
         self.dictfee_weekday = {}
         self.dictfee_holiday = {}
         self.result = result
+        self.dict_in = {}
+        self.dict_out = {}
 
     # `_round_hours_dict` 方法已移除；调用处改为内联四舍五入处理
 
@@ -63,6 +65,29 @@ class Count_criterion(object):
         except ConnectionResetError as e:
             print("远程主机发生错误" + e)
 
+    def set_blank(self):
+        wb = load_workbook(filename="进出场记录.xlsx")
+        ws = wb["Sheet1"]
+        for row in ws.rows:
+            if row[17].value == "进厂":
+                self.dict_in.setdefault(row[11].value, []).append(row[0].value)
+            elif row[17].value == "出厂":
+                self.dict_out.setdefault(row[11].value, []).append(row[0].value)
+
+        # 数组转换为字典
+        for k in self.dict_in:
+            temp = {}
+            for v in self.dict_in[k]:
+                d, t = str(v).split()[0], str(v).split()[1]
+                temp.setdefault(d, []).append(t)
+            self.dict_in[k] = temp
+        for k in self.dict_out:
+            temp = {}
+            for v in self.dict_out[k]:
+                d, t = str(v).split()[0], str(v).split()[1]
+                temp.setdefault(d, []).append(t)
+            self.dict_out[k] = temp
+
     # 计算统计表里的加班小时数
     def writeStatisticsSheet(self):
         temp17 = datetime.datetime.strptime("17:30:00", "%H:%M:%S")
@@ -75,6 +100,8 @@ class Count_criterion(object):
         temp24 = temp0 + datetime.timedelta(days=1)
         temp1700 = datetime.datetime.strptime("17:00:00", "%H:%M:%S")
         self.getUrl()
+        # 夜班有可能丢失数据，用进出场记录填充
+        self.set_blank()
 
         for id in self.ids:
             criterion_dict = {}
@@ -88,23 +115,22 @@ class Count_criterion(object):
                         time2 = x[4].value
                         criterion_dict[temp] = (time1, time2)
 
-            # 查找标准班制人员值夜班的情况
+            # 计算标准班制加班小时数
             sorted_criterion_dict = dict(sorted(criterion_dict.items()))
             for key, value in sorted_criterion_dict.items():
                 # 第一种情况，正常上下班，区分平日和周末
                 if value[0] is not None and value[1] is not None:
-                    start = datetime.datetime.strptime(
-                        value[0], "%H:%M:%S")
+                    start = datetime.datetime.strptime(value[0], "%H:%M:%S")
                     end = datetime.datetime.strptime(value[1], "%H:%M:%S")
                     hour = 0
                     if key in self.workday.keys():
                         if end >= temp18:
                             hour = round((end - temp17).seconds / 3600, 2)
-                            sorted_criterion_dict[key] = value + \
-                                (hour, '工作日')
+                            sorted_criterion_dict[key] = value + (hour, "工作日")
                             temp_dict[key] = hour
                             self.dictall[id.value] = {
-                                k: round(v, 2) for k, v in temp_dict.items()}
+                                k: round(v, 2) for k, v in temp_dict.items()
+                            }
 
                     if key in self.weekday.keys() or key in self.holiday.keys():
                         if end > start:
@@ -118,99 +144,202 @@ class Count_criterion(object):
                                 end = temp13
 
                             if start <= temp12 and end >= temp13:
-                                hour = round(
-                                    (end - start).seconds / 3600, 2) - 1.5
+                                hour = round((end - start).seconds / 3600, 2) - 1.5
                             else:
-                                hour = round(
-                                    (end - start).seconds / 3600, 2)-0.5
+                                hour = round((end - start).seconds / 3600, 2) - 0.5
 
                             if hour < 0:
                                 hour = 0
 
                             if self.result.get(key) == 2:
-                                sorted_criterion_dict[key] = value + \
-                                    (hour, '公休日')
+                                sorted_criterion_dict[key] = value + (hour, "公休日")
                                 temp_dict[key] = hour
                                 self.dictall[id.value] = {
-                                    k: round(v, 2) for k, v in temp_dict.items()}
+                                    k: round(v, 2) for k, v in temp_dict.items()
+                                }
                             elif self.result.get(key) == 3:
-                                sorted_criterion_dict[key] = value + \
-                                    (hour, '节假日')
+                                sorted_criterion_dict[key] = value + (hour, "节假日")
                                 temp_dict[key] = hour
                                 self.dictall[id.value] = {
-                                    k: round(v, 2) for k, v in temp_dict.items()}
+                                    k: round(v, 2) for k, v in temp_dict.items()
+                                }
 
+            # 计算夜班加班小时数
             for n in range(len(sorted_criterion_dict)):
-                key1 = list(sorted_criterion_dict.keys())[n]
-                value0 = sorted_criterion_dict[key1][0]
-                value1 = sorted_criterion_dict[key1][1]
-                if n+1 < len(sorted_criterion_dict):
-                    key2 = list(sorted_criterion_dict.keys())[n+1]
-                    value3 = sorted_criterion_dict[key2][0]
-                    value4 = sorted_criterion_dict[key2][1]
+                key = list(sorted_criterion_dict.keys())[n]
+                key_temp = datetime.datetime.strptime(key, "%Y%m%d").strftime(
+                    "%Y-%m-%d"
+                )
+                if key_temp in self.dict_in[id.value]:
+                    in_time = self.dict_in[id.value][key_temp]
+                else:
+                    in_time = []
+                if key_temp in self.dict_out[id.value]:
+                    out_time = self.dict_out[id.value][key_temp]
+                else:
+                    out_time = []
 
-                    if value0 is not None and value1 is None:
-                        if value3 is None and value4 is not None:
-                            start = datetime.datetime.strptime(
-                                value0, "%H:%M:%S")
-                            end = datetime.datetime.strptime(
-                                value4, "%H:%M:%S")
-                            hour = 0
+                hour = 0
+                if in_time or out_time: #先排除没有记录的情况
+                    #只有进厂记录，没有出厂记录，说明是前半夜有夜班（可能有出厂未打上卡的情况，先忽略）
+                    if in_time and not out_time:
+                        start = datetime.datetime.strptime(min(in_time), "%H:%M:%S")
+                        if key in self.workday.keys():
                             if start < temp1700:
                                 start = temp1700
+                            hour = round((temp24 - start).seconds / 3600, 2)
+                            sorted_criterion_dict[key] = value + (
+                                hour,
+                                "工作日(前夜班)",
+                            )
+                            temp_dict[key] = hour
+                            self.dictall[id.value] = {
+                                k: round(v, 2) for k, v in temp_dict.items()
+                            }
+                        elif key in self.weekday.keys():
+                            hour = round((temp24 - start).seconds / 3600, 2)
+                            sorted_criterion_dict[key] = value + (
+                                hour,
+                                "公休日(前夜班)",
+                            )
+                            temp_dict[key] = hour
+                            self.dictall[id.value] = {
+                                k: round(v, 2) for k, v in temp_dict.items()
+                            }
+                        elif key in self.holiday.keys():
+                            hour = round((temp24 - start).seconds / 3600, 2)
+                            sorted_criterion_dict[key] = value + (
+                                hour,
+                                "节假日(前夜班)",
+                            )
+                            temp_dict[key] = hour
+                            self.dictall[id.value] = {
+                                k: round(v, 2) for k, v in temp_dict.items()
+                            }
+                    # 这一天最后进厂记录比最后出厂记录还晚，说明前半夜有夜班
+                    if in_time and out_time:
+                        if max(in_time) > max(out_time) and min(in_time) < min(out_time):
+                            # 分平日、公休日、节假日
+                            start = datetime.datetime.strptime(min(in_time), "%H:%M:%S")
+                            if key in self.workday.keys():
+                                if start < temp1700:
+                                    start = temp1700
+                                hour = round((temp24 - start).seconds / 3600, 2)
+                                sorted_criterion_dict[key] = value + (
+                                    hour,
+                                    "工作日(前夜班)",
+                                )
+                                temp_dict[key] = hour
+                                self.dictall[id.value] = {
+                                    k: round(v, 2) for k, v in temp_dict.items()
+                                }
+                            elif key in self.weekday.keys():
+                                hour = round((temp24 - start).seconds / 3600, 2)
+                                sorted_criterion_dict[key] = value + (
+                                    hour,
+                                    "公休日(前夜班)",
+                                )
+                                temp_dict[key] = hour
+                                self.dictall[id.value] = {
+                                    k: round(v, 2) for k, v in temp_dict.items()
+                                }
+                            elif key in self.holiday.keys():
+                                hour = round((temp24 - start).seconds / 3600, 2)
+                                sorted_criterion_dict[key] = value + (
+                                    hour,
+                                    "节假日(前夜班)",
+                                )
+                                temp_dict[key] = hour
+                                self.dictall[id.value] = {
+                                    k: round(v, 2) for k, v in temp_dict.items()
+                                }
+
+                    # 没有进厂记录只有出厂记录，说明后半夜有夜班
+                    if not in_time and out_time:
+                        # 分平日、公休日、节假日
+                        end = datetime.datetime.strptime(max(out_time), "%H:%M:%S")
+                        if key in self.workday.keys():
                             if end > temp8:
                                 end = temp8
+                            hour = round((end - temp0).seconds / 3600, 2)
+                            sorted_criterion_dict[key] = value + (
+                                hour,
+                                "工作日(后夜班)",
+                            )
+                            temp_dict[key] = hour
+                            self.dictall[id.value] = {
+                                k: round(v, 2) for k, v in temp_dict.items()
+                            }
+                        elif key in self.weekday.keys():
+                            hour = round((end - temp0).seconds / 3600, 2)
+                            sorted_criterion_dict[key] = value + (
+                                hour,
+                                "公休日(后夜班)",
+                            )
+                            temp_dict[key] = hour
+                            self.dictall[id.value] = {
+                                k: round(v, 2) for k, v in temp_dict.items()
+                            }
+                        elif key in self.holiday.keys():
+                            hour = round((end - temp0).seconds / 3600, 2)
+                            sorted_criterion_dict[key] = value + (
+                                hour,
+                                "节假日(后夜班)",
+                            )
+                            temp_dict[key] = hour
+                            self.dictall[id.value] = {
+                                k: round(v, 2) for k, v in temp_dict.items()
+                            }
 
-                            if key1 in self.workday.keys():
+                    # 出厂记录和进厂记录都有，但进厂大于出厂，说明上半夜和下半夜都有夜班
+                    if in_time and out_time:
+                        # 分平日、公休日、节假日
+                        start_min = datetime.datetime.strptime(min(in_time), "%H:%M:%S")
+                        start = datetime.datetime.strptime(max(in_time), "%H:%M:%S")
+                        end = datetime.datetime.strptime(max(out_time), "%H:%M:%S")
+                        if end < start_min:
+                            if key in self.workday.keys():
+                                if start < temp1700:
+                                    start = temp1700
+                                if end > temp8:
+                                    end = temp8
                                 hour = round(
-                                    (temp24 - start).seconds / 3600, 2)
-                                sorted_criterion_dict[key1] = value + \
-                                    (hour, '工作日(夜班)')
-                                temp_dict[key1] = hour
+                                    (temp24 - start).seconds / 3600, 2
+                                ) + round((end - temp0).seconds / 3600, 2)
+                                sorted_criterion_dict[key] = value + (
+                                    hour,
+                                    "工作日(双夜班)",
+                                )
+                                temp_dict[key] = hour
                                 self.dictall[id.value] = {
-                                    k: round(v, 2) for k, v in temp_dict.items()}
-                            elif key1 in self.weekday.keys():
+                                    k: round(v, 2) for k, v in temp_dict.items()
+                                }
+                            elif key in self.weekday.keys():
                                 hour = round(
-                                    (temp24 - start).seconds / 3600, 2)
-                                sorted_criterion_dict[key1] = value + \
-                                    (hour, '公休日(夜班)')
-                                temp_dict[key1] = hour
+                                    (temp24 - start).seconds / 3600, 2
+                                ) + round((end - temp0).seconds / 3600, 2)
+                                sorted_criterion_dict[key] = value + (
+                                    hour,
+                                    "公休日(双夜班)",
+                                )
+                                temp_dict[key] = hour
                                 self.dictall[id.value] = {
-                                    k: round(v, 2) for k, v in temp_dict.items()}
-                            elif key1 in self.holiday.keys():
+                                    k: round(v, 2) for k, v in temp_dict.items()
+                                }
+                            elif key in self.holiday.keys():
                                 hour = round(
-                                    (temp24 - start).seconds / 3600, 2)
-                                sorted_criterion_dict[key1] = value + \
-                                    (hour, '节假日(夜班)')
-                                temp_dict[key1] = hour
+                                    (temp24 - start).seconds / 3600, 2
+                                ) + round((end - temp0).seconds / 3600, 2)
+                                sorted_criterion_dict[key] = value + (
+                                    hour,
+                                    "节假日(双夜班)",
+                                )
+                                temp_dict[key] = hour
                                 self.dictall[id.value] = {
-                                    k: round(v, 2) for k, v in temp_dict.items()}
+                                    k: round(v, 2) for k, v in temp_dict.items()
+                                }
 
-                            if key2 in self.workday.keys():
-                                hour = round(
-                                    (end - temp0).seconds / 3600, 2)
-                                sorted_criterion_dict[key2] = value + \
-                                    (hour, '工作日(夜班)')
-                                temp_dict[key2] = hour
-                                self.dictall[id.value] = {
-                                    k: round(v, 2) for k, v in temp_dict.items()}
-                            elif key2 in self.weekday.keys():
-                                hour = round(
-                                    (end - temp0).seconds / 3600, 2)
-                                sorted_criterion_dict[key2] = value + \
-                                    (hour, '公休日(夜班)')
-                                temp_dict[key2] = hour
-                                self.dictall[id.value] = {
-                                    k: round(v, 2) for k, v in temp_dict.items()}
-                            elif key2 in self.holiday.keys():
-                                hour = round(
-                                    (end - temp0).seconds / 3600, 2)
-                                sorted_criterion_dict[key2] = value + \
-                                    (hour, '节假日(夜班)')
-                                temp_dict[key2] = hour
-                                self.dictall[id.value] = {
-                                    k: round(v, 2) for k, v in temp_dict.items()}
-            
+            # 在单元格内填写数据
             for m in self.ws1.rows:
                 if m[5].value == self.month:
                     if m[1].value == id.value:
@@ -220,18 +349,20 @@ class Count_criterion(object):
                                 m[8].value = sorted_criterion_dict[s][2]
                                 m[6].value = sorted_criterion_dict[s][3]
 
-                        # 孔祥雨特殊处理，后续删除
-                        if id.value=="Q5756":                            
-                            if s == "20260625":
-                                self.dictall[id.value][s] = 15
-                                m[8].value = 15
-                            if s == "20260626":
-                                self.dictall[id.value][s] = 8
-                                m[8].value = 8
+                        # 某些人的特殊处理，相当于手动填入加班时间，先保留，如果无法命中也不会执行
+                        # if id.value=="Q5756":
+                        #     if s == "20260625":
+                        #         self.dictall[id.value][s] = 15
+                        #         m[8].value = 15
+                        #     if s == "20260626":
+                        #         self.dictall[id.value][s] = 8
+                        #         m[8].value = 8
 
     def writeRecordsSheet(self):
         # 清空记录表
-        for row in self.ws2.iter_rows(min_row=3, max_row=self.ws2.max_row, min_col=3, max_col=35):
+        for row in self.ws2.iter_rows(
+            min_row=3, max_row=self.ws2.max_row, min_col=3, max_col=35
+        ):
             for cell in row:
                 cell.value = None
 
@@ -242,7 +373,7 @@ class Count_criterion(object):
                 s = self.format_date(row[2].value)
                 if s in self.dictfee.get(row[1].value, {}):
                     if row[10].value > 0:
-                        row[10].value = -1*row[10].value
+                        row[10].value = -1 * row[10].value
                     self.dictfee[row[1].value][s] += row[10].value
 
         for id in self.ids:
@@ -268,16 +399,13 @@ class Count_criterion(object):
             }
 
             self.dictfee_holiday[self.id.value] = dict(
-                sorted(holiday_items.items(),
-                       key=lambda item: item[1], reverse=True)
+                sorted(holiday_items.items(), key=lambda item: item[1], reverse=True)
             )
             self.dictfee_weekday[self.id.value] = dict(
-                sorted(weekday_items.items(),
-                       key=lambda item: item[1], reverse=True)
+                sorted(weekday_items.items(), key=lambda item: item[1], reverse=True)
             )
             self.dictfee_workday[self.id.value] = dict(
-                sorted(workday_items.items(),
-                       key=lambda item: item[1], reverse=True)
+                sorted(workday_items.items(), key=lambda item: item[1], reverse=True)
             )
 
             # 先扣除加班费小时数较多的日期，保证扣除的串休小时数最少
@@ -306,8 +434,7 @@ class Count_criterion(object):
             remainer = 36
             cash_dict = {}
             rest_dict = {}
-            sorted_dict = dict(
-                sorted(day_dict.items(), key=lambda item: item[0]))
+            sorted_dict = dict(sorted(day_dict.items(), key=lambda item: item[0]))
 
             if sum(self.dictfee_holiday[self.id.value].values()) >= remainer:
                 fill_until_zero(self.dictfee_holiday[self.id.value])
@@ -315,13 +442,11 @@ class Count_criterion(object):
                 assign_all(self.dictfee_holiday[self.id.value])
                 if remainer > 0:
                     if sum(self.dictfee_weekday[self.id.value].values()) >= remainer:
-                        fill_until_zero(
-                            self.dictfee_weekday[self.id.value])
+                        fill_until_zero(self.dictfee_weekday[self.id.value])
                     else:
                         assign_all(self.dictfee_weekday[self.id.value])
                         if remainer > 0:
-                            fill_until_zero(
-                                self.dictfee_workday[self.id.value])
+                            fill_until_zero(self.dictfee_workday[self.id.value])
 
             for y in self.ws1.rows:
                 if y[8].value is not None:
@@ -330,9 +455,14 @@ class Count_criterion(object):
                         if s in cash_dict:
                             y[7].value = "转加班费"
                         if s in cash_dict and s in rest_dict:
-                            y[7].value = "转加班费" + str(round(cash_dict.get(s, 0), 2)) + \
-                                "小时、" + "转串休" + \
-                                str(round(rest_dict.get(s, 0), 2)) + "小时"
+                            y[7].value = (
+                                "转加班费"
+                                + str(round(cash_dict.get(s, 0), 2))
+                                + "小时、"
+                                + "转串休"
+                                + str(round(rest_dict.get(s, 0), 2))
+                                + "小时"
+                            )
                         if s not in cash_dict:
                             y[7].value = "转串休"
 
@@ -343,13 +473,17 @@ class Count_criterion(object):
                 for y in x:
                     for z in sorted_dict:
                         if y.value.strftime("%Y%m%d") == z:
-                            self.ws2.cell(row=self.id.row, column=y.column).value = sorted_dict[
-                                z
-                            ]
+                            self.ws2.cell(row=self.id.row, column=y.column).value = (
+                                sorted_dict[z]
+                            )
             self.ws2.cell(row=self.id.row, column=34).value = sum(
-                list(sorted_dict.values()))
-            self.ws2.cell(row=self.id.row, column=35).value = sum(
-                list(sorted_dict.values())) - 36 if sum(list(sorted_dict.values())) > 36 else 0
+                list(sorted_dict.values())
+            )
+            self.ws2.cell(row=self.id.row, column=35).value = (
+                sum(list(sorted_dict.values())) - 36
+                if sum(list(sorted_dict.values())) > 36
+                else 0
+            )
 
     def writeDetailsSheet(self):
         ws3 = self.wb["明细表"]
@@ -362,33 +496,46 @@ class Count_criterion(object):
                     overtime_dict = self.dictall.get(cell.value, {})
                     # 合计
                     ws3.cell(row=cell.row, column=5).value = round(
-                        sum(overtime_dict.values()), 2)
+                        sum(overtime_dict.values()), 2
+                    )
                     # 工作日加班小时数
                     ws3.cell(
                         row=cell.row,
                         column=6,
-                        value=round(sum(
-                            hours for date_key, hours in overtime_dict.items()
-                            if self.result.get(date_key) == 1.5
-                        ), 2),
+                        value=round(
+                            sum(
+                                hours
+                                for date_key, hours in overtime_dict.items()
+                                if self.result.get(date_key) == 1.5
+                            ),
+                            2,
+                        ),
                     )
                     # 公休日加班小时数
                     ws3.cell(
                         row=cell.row,
                         column=7,
-                        value=round(sum(
-                            hours for date_key, hours in overtime_dict.items()
-                            if self.result.get(date_key) == 2
-                        ), 2),
+                        value=round(
+                            sum(
+                                hours
+                                for date_key, hours in overtime_dict.items()
+                                if self.result.get(date_key) == 2
+                            ),
+                            2,
+                        ),
                     )
                     # 节假日加班小时数
                     ws3.cell(
                         row=cell.row,
                         column=8,
-                        value=round(sum(
-                            hours for date_key, hours in overtime_dict.items()
-                            if self.result.get(date_key) == 3
-                        ), 2),
+                        value=round(
+                            sum(
+                                hours
+                                for date_key, hours in overtime_dict.items()
+                                if self.result.get(date_key) == 3
+                            ),
+                            2,
+                        ),
                     )
                     # 写入串休扣除数
                     # 从统计表中汇总该 id 在本月的串休扣除（统计表第10列，索引9）并写入明细表第9列
@@ -451,7 +598,8 @@ class Count_criterion(object):
 
                     # 加班费基数，成本科要求在这保存两位小数
                     base_salary = round(
-                        ws3.cell(row=cell.row, column=4).value/21.75/8, 2)
+                        ws3.cell(row=cell.row, column=4).value / 21.75 / 8, 2
+                    )
                     # 工作日加班费
                     ws3.cell(
                         row=cell.row,
@@ -479,8 +627,7 @@ class Count_criterion(object):
                         + (ws3.cell(row=cell.row, column=17).value or 0)
                         + (ws3.cell(row=cell.row, column=18).value or 0)
                     )
-                    ws3.cell(row=cell.row, column=15,
-                             value=round(total_pay, 2))
+                    ws3.cell(row=cell.row, column=15, value=round(total_pay, 2))
 
     def jiSuan(self):
         # 将计算结果写入统计表中
