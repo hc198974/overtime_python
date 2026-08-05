@@ -9,14 +9,17 @@ import win32com.client
 import time
 import functools
 import os
+import logging
 from openpyxl import load_workbook
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def run_time(fn):  # 用于测试方法运行时间的装饰器
     @functools.wraps(fn)
     def wrapper(*args, **kw):
         start = time.perf_counter()
         res = fn(*args, **kw)
-        print('%s 运行了 %f 秒' % (fn, time.perf_counter() - start))
+        logging.info('%s 运行了 %f 秒', fn.__name__, time.perf_counter() - start)
         return res
     return wrapper
 
@@ -189,7 +192,7 @@ class Cmacro:
         excel = win32com.client.Dispatch("Excel.Application")
         excel.Visible = True
         wb = excel.Workbooks.Open(self.path)
-        print("START")
+        logging.info("开始处理Excel数据")
         excel.Application.Run("deleteRow")
         script_dir = os.path.dirname(os.path.abspath(__file__))
         save_path = os.path.join(script_dir, "计算结果.xlsx")
@@ -199,7 +202,7 @@ class Cmacro:
             ConflictResolution=2,
         )
         wb.Close()
-        print("END")
+        logging.info("Excel数据处理完成")
         excel.Quit()
 
 # 这是用来获得当月节假日（wage=3）的类，接口来自 timor.tech
@@ -225,7 +228,7 @@ class Ccal:
                     holidays.append(date)
             return holidays
         except requests.RequestException as e:
-            print(f"请求出错: {e}")
+            logging.error("请求出错: %s", e)
         except (KeyError, ValueError) as e:
-            print(f"解析数据出错: {e}")
+            logging.error("解析数据出错: %s", e)
         return []
