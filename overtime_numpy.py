@@ -18,7 +18,7 @@ def overtime_cal(datas, result):
     flat_list = [item for sublist in modified_chunk for item in sublist]
     # 转换为DataFrame
     df = pd.DataFrame(flat_list, columns=[
-        '姓名', '日报日期', '上班时间', '下班时间',
+        '姓名', '日报日期', '签到', '签出',
         '月份', '节假日', '加班或串休', '时长'
     ])
     return df
@@ -117,7 +117,15 @@ def generate_summary_table(df):
     # 使用 groupby 替代 pivot_table，性能更好
     summary_df = df.groupby(['姓名', '日报日期'])['时长'].sum().unstack(fill_value=0)
     summary_df['合计'] = summary_df.sum(axis=1)
-    return summary_df.reset_index()
+    # 可串休时间：转串休（加班或串休 == '转串休'）部分的加班时长
+    ksx = (df[df['加班或串休'] == '转串休']
+           .groupby('姓名')['时长'].sum()
+           .rename('可串休时间'))
+    summary_df = summary_df.reset_index()
+    summary_df = summary_df.merge(ksx, on='姓名', how='left').fillna({'可串休时间': 0})
+    # 序号列
+    summary_df.insert(0, '序号', range(1, len(summary_df) + 1))
+    return summary_df
 
 
 if __name__ == "__main__":
@@ -138,7 +146,7 @@ if __name__ == "__main__":
         # 多表导出到excel
         with pd.ExcelWriter("计算结果.xlsx") as writer:
             df.to_excel(writer, index=False,
-                        sheet_name='明细', engine='openpyxl')
+                        sheet_name='汇总表', engine='openpyxl')
             summary_df.to_excel(writer, index=False,
-                                sheet_name='汇总', engine='openpyxl')
+                                sheet_name='中干', engine='openpyxl')
     print("运行时间：", time.perf_counter() - start)

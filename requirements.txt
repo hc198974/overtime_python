@@ -4,3 +4,4 @@ Requests~=2.24.0
 future~=0.18.2
 pandas~=1.1.3
 numpy~=1.19.2
+pywin32  # demos.py 通过 win32com 调用 Excel 宏，原清单缺失此依赖

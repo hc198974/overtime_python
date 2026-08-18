@@ -12,8 +12,8 @@ def custom_gettime(df):
     temp8 = datetime.datetime.strptime("8:00:00", "%H:%M:%S").time()
 
     def calculate_time(row):
-        sb = row['上班时间']
-        xb = row['下班时间']
+        sb = row['签到']
+        xb = row['签出']
         if pd.isna(sb) or pd.isna(xb):
             return 0
         if isinstance(sb, str):
@@ -161,8 +161,15 @@ def generate_summary_table(df):
                            values='时长', aggfunc='sum', fill_value=0)
     # 添加合计列
     pivot['合计'] = pivot.sum(axis=1)
-    # 重置索引
+    # 可串休时间：转串休（加班或串休 == 0）部分的加班时长
+    ksx = (df[df['加班或串休'] == 0]
+           .groupby('姓名')['时长'].sum()
+           .rename('可串休时间'))
+    # 重置索引并补齐列
     summary_df = pivot.reset_index()
+    summary_df = summary_df.merge(ksx, on='姓名', how='left').fillna({'可串休时间': 0})
+    # 序号列
+    summary_df.insert(0, '序号', range(1, len(summary_df) + 1))
     return summary_df
 
 
@@ -192,9 +199,9 @@ def main(calendars):
     # 多表导出到excel
 
     with pd.ExcelWriter("计算结果.xlsx") as writer:
-        df.to_excel(writer, index=False, sheet_name='明细', engine='openpyxl')
+        df.to_excel(writer, index=False, sheet_name='汇总表', engine='openpyxl')
         summary_df.to_excel(writer, index=False,
-                            sheet_name='汇总', engine='openpyxl')
+                            sheet_name='中干', engine='openpyxl')
     print("时间：", time.perf_counter() - start)
 
 
