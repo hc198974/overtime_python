@@ -110,7 +110,7 @@ def calculate_dict_overtime(dict_in_out: dict, emp_id: str, d: str) -> list:
 
     # 班次类型说明：
     # - 前半夜加班 = 17:00-24:00 加班
-    # - 后半夜值班 = 0:00-8:00 值班
+    # - 后半夜加班 = 0:00-8:00 加班
     # - 白天 = 8:00-17:00（白班 8 点起步，进厂 < 8:00 按 8:00 算）
     # - 跨月份边界：若 d 是该月第一天则前一日视为无数据（可默认未出厂）；
     #              若 d 是该月最后一天则后一日视为无数据（可默认正常出厂）。
@@ -185,14 +185,14 @@ def calculate_dict_overtime(dict_in_out: dict, emp_id: str, d: str) -> list:
             # out ≥ 8:00 → 真正有后半夜+白天
             night_type = "back+day"
         else:
-            # out < 8:00 → 仅后半夜值班，无白天
+            # out < 8:00 → 仅后半夜加班，无白天
             night_type = "back"
     # 情况三：进出相等 → 分两种子情况处理
     # 3a) 最大出厂 < 最小入厂 → 后半夜 + 前半夜
-    #     判定后半夜值班：看前一天该人员最后一条记录
-    #         前一天最后记录为进厂（未出厂）→ 有后半夜值班
-    #         前一天最后记录为出厂 → 无后半夜值班，记录不闭合
-    #         前一天无数据 → 默认未出厂，视为有后半夜值班
+    #     判定后半夜加班：看前一天该人员最后一条记录
+    #         前一天最后记录为进厂（未出厂）→ 有后半夜加班
+    #         前一天最后记录为出厂 → 无后半夜加班，记录不闭合
+    #         前一天无数据 → 默认未出厂，视为有后半夜加班
     #     判定前半夜加班：看第二天该人员最后一条记录
     #         第二天最后记录为出厂 → 有前半夜加班
     #         第二天最后记录为进厂 → 无前半夜加班，记录不闭合
@@ -253,7 +253,7 @@ def calculate_dict_overtime(dict_in_out: dict, emp_id: str, d: str) -> list:
 
     if wd == 1.5:
         if night_type == "back":
-            # 后半夜值班：0:00-8:00
+            # 后半夜加班：0:00-8:00
             intervals = [(T0, T8)]
         elif night_type == "front":
             # 前半夜加班：17:00-24:00
@@ -406,6 +406,8 @@ def calculate_dict_overtime_night(dict_in_out: dict, emp_id: str, d: str) -> lis
         hour = calday(time1, min(time2, T17))
         total_hours = (hour, 0.0)
         coe = get_coe(wd)
+        
+        
 
     else:
         logging.warning(f"{d} 进出场记录异常，无法判定夜班类型")
@@ -572,14 +574,14 @@ def _write_mingxi_row(row: list, emp_id: str, total: float, work: float,
     )
 
     # 加班费金额：工资基数 = round(基本工资 / 21.75 / 8, 2)
-    # P列工作日1.5倍 / Q列公休日2倍 / R列节假日3倍，O列为三者之和
+    # P列工作日1.5倍 / Q列公休日2倍 / R列节假日3倍，O列为三者之和，加班费取整数
     basic_salary = row[3].value
     if isinstance(basic_salary, (int, float)) and basic_salary > 0:
         base_rate = round(basic_salary / 21.75 / 8, 2)
-        p_value = round(base_rate * 1.5 * floored_pay_work, 2)
-        q_value = round(base_rate * 2 * floored_pay_rest, 2)
-        r_value = round(base_rate * 3 * floored_pay_holiday, 2)
-        o_value = round(p_value + q_value + r_value, 2)
+        p_value = round(base_rate * 1.5 * floored_pay_work)
+        q_value = round(base_rate * 2 * floored_pay_rest)
+        r_value = round(base_rate * 3 * floored_pay_holiday)
+        o_value = round(p_value + q_value + r_value)
         _set_if_nonzero(row[15], p_value)
         _set_if_nonzero(row[16], q_value)
         _set_if_nonzero(row[17], r_value)
@@ -1137,6 +1139,6 @@ def calculate_main(ids: list, night_ids: list = None) -> None:
     logging.info("计算完成，结果已写入 计算结果.xlsx")
 
 
-if __name__ == "__main__":
-    logging.info("===== 加班计算程序启动 =====")
-    calculate_main(["Q4642"], night_ids=["Q4642"])
+# if __name__ == "__main__":
+#     logging.info("===== 加班计算程序启动 =====")
+#     calculate_main(["Q4642"], night_ids=["Q4642"])
