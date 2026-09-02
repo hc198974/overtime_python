@@ -94,6 +94,8 @@ def calculate_dict_overtime(dict_in_out: dict, emp_id: str, d: str) -> list:
     Returns:
         [加班时长, 夜班类型]
     """
+    
+
     records = dict_in_out[emp_id][d]
     if not records:
         return [0, "unknown"]
@@ -298,12 +300,34 @@ def calculate_dict_overtime(dict_in_out: dict, emp_id: str, d: str) -> list:
                 dict_overtime_sec += overlap(in_time, out_time, lo, hi)
             in_time = None
 
+     # 支持特殊工号的自定义算法（曲书成在这两天是白班模式）
+    if emp_id == "Q6007":
+        if d in ["20260801", "20260808"]:
+            try:
+                dict_overtime_sec=0
+                intervals = [(T0, T12), (T13, T24)]
+                for t, direction in records:                    
+                    ts = to_sec(t)
+                    if direction == "in":
+                        in_time = ts
+                    elif direction == "out" and in_time is not None:
+                        out_time = ts
+                        
+                        for lo, hi in intervals:
+                            dict_overtime_sec += overlap(in_time, out_time, lo, hi)
+                        in_time = None
+                        
+            except Exception as e:
+                logging.warning(f"special overtime standard failed for {emp_id} {d}: {e}, fallback to default")
+    
     if adjust and dict_overtime_sec > 0:
         if wd == 1.5:
             dict_overtime_sec += 1800
         elif wd in (2, 3):
             dict_overtime_sec -= 1800
 
+     
+   
     return [round(max(0, dict_overtime_sec / 3600), 2), night_type]
 
 
@@ -316,6 +340,7 @@ def calculate_dict_overtime_night(dict_in_out: dict, emp_id: str, d: str) -> lis
     Returns:
         [日期, 总加班时长元组, 系数元组, 夜班类型]
     """
+
     records = dict_in_out[emp_id][d]
     
     if not records:
@@ -401,18 +426,27 @@ def calculate_dict_overtime_night(dict_in_out: dict, emp_id: str, d: str) -> lis
         coe = get_coe(wd)
 
     # 场景 5: 纯白班 (有进有出)
-    elif time1 is not None and time2 is not None:
+    elif time1 is not None and time2 is not None and time1<time2:
         night_type = "day"
         hour = calday(time1, min(time2, T17))
         total_hours = (hour, 0.0)
+        coe = get_coe(wd)     
+    
+    # 场景 6: 连续上夜班，前半夜+后半夜
+    elif time1 is not None and time2 is not None and time2<time1:
+        night_type = "front+back"
+        if time1 < T17:
+            time1 = T17
+        if time2 > T8:
+            time2 = T8
+        total_hours = (0.0, round((T24 - time1) / 3600 + (time2 - T0) / 3600, 2))
         coe = get_coe(wd)
-        
-        
-
     else:
         logging.warning(f"{d} 进出场记录异常，无法判定夜班类型")
         return [d, (0.0, 0.0), (0.0, 0.0), "unknown"]
-
+   
+    
+    
     return [d, total_hours, coe, night_type]
 
 
