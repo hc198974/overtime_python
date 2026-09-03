@@ -64,6 +64,35 @@ MONTH = 8     # 1~12，无需补零
 
 > 注意：`config` 设置的年月应与《进出场记录.xlsx》中实际数据所属月份一致，否则计算结果为空或错位。
 
+**新增配置（区分标准人员与夜班人员）**
+
+- **配置文件**: 在 [config.py](config.py#L1-L200) 中新增或扩展若干配置项，用以控制夜班与标准人员的加班时长与加班费计算：
+   - `NIGHT_EMPLOYEE_VACATION_DAYS`（字典）：按工号映射夜班人员当月休年假天数，格式示例：{"60836": 4}（单位：天，整数）。
+   - `STANDARD_EMPLOYEE_VACATION_DAYS`（可选字典）：按工号映射标准人员当月休年假天数（若需要同样的年假扣减逻辑，可在此配置）。
+   - `MIN_WAGE`（数值）：最低工资（单位：元，支持小数），用于加班费基数下限，当明细表中的基本工资低于此值时使用该最低值计算时薪基数。
+
+- **计算方法区分**:
+   - **标准人员**（`calculate_dict_overtime` + `calculate_36h_truncation`）：按日累计工作日/休息日/节假日加班小时后，进入 36 小时截断分配（节假日→休息日→工作日）。如果提供 `STANDARD_EMPLOYEE_VACATION_DAYS`，可在截断前从当月累计或工作时长中扣减相应年假（实现可按需启用）。
+   - **夜班人员**（`calculate_dict_overtime_night` + `calculate_night_truncation`）：夜班计算逻辑与标准人员不同（按上半夜/下半夜/白天+夜段等场景计算），且当前实现会从当月 `work_hours`（按工作日计 8 小时/天）中扣减 `NIGHT_EMPLOYEE_VACATION_DAYS` 指定的年假天数（`work_hours = max(0, work_hours - d * 15)`），再据此计算加班费与串休的分配额度。
+
+- **加班费计算（通用）**:
+   - 加班费金额仍按时薪基数 `base_rate = round(effective_salary / 21.75 / 8, 2)` 计算，`effective_salary` 为 `max(basic_salary, MIN_WAGE)`（当 `basic_salary` 无效时直接使用 `MIN_WAGE`）。此规则适用于标准与夜班人员的金额计算，保证低工资不致产生过低的基数。
+
+- **如何设置（示例）**:
+
+```python
+NIGHT_EMPLOYEE_VACATION_DAYS = {
+      "60836": 4,
+}
+# 若需对标准人员也生效，可添加：
+STANDARD_EMPLOYEE_VACATION_DAYS = {
+      "Q4642": 2,
+}
+MIN_WAGE = 3000.0
+```
+
+- **已修复注意事项**: 之前若误将 `NIGHT_EMPLOYEE_VACATION_DAYS` 写成集合（例如 {"60836",4}）会导致扣减逻辑被静默忽略；当前代码已使用字典格式并在读取配置时进行了保护性处理，请按示例填写。
+
 ## 使用流程
 
 ### 1. 准备源数据

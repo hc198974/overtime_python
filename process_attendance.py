@@ -1,10 +1,10 @@
 from openpyxl import load_workbook
 from demos import Crili
-import config
 import datetime
 import calendar
 import logging
 from copy import deepcopy
+import config
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -78,7 +78,7 @@ def load_workbook_safe(filename: str):
         raise
 
 
-crili = Crili(config.YEAR, config.MONTH)
+crili = Crili(2026, datetime.datetime.now().month - 1)
 weekday = crili.parseHTML()
 
 
@@ -609,18 +609,28 @@ def _write_mingxi_row(row: list, emp_id: str, total: float, work: float,
     )
 
     # 加班费金额：工资基数 = round(基本工资 / 21.75 / 8, 2)
+    # 使用最低工资阈值：若 basic_salary < MIN_WAGE 则使用 MIN_WAGE 作为基数
     # P列工作日1.5倍 / Q列公休日2倍 / R列节假日3倍，O列为三者之和，加班费取整数
     basic_salary = row[3].value
+    try:
+        min_wage = float(config.MIN_WAGE)
+    except Exception:
+        min_wage = 0.0
+
     if isinstance(basic_salary, (int, float)) and basic_salary > 0:
-        base_rate = round(basic_salary / 21.75 / 8, 2)
-        p_value = round(base_rate * 1.5 * floored_pay_work)
-        q_value = round(base_rate * 2 * floored_pay_rest)
-        r_value = round(base_rate * 3 * floored_pay_holiday)
-        o_value = round(p_value + q_value + r_value)
-        _set_if_nonzero(row[15], p_value)
-        _set_if_nonzero(row[16], q_value)
-        _set_if_nonzero(row[17], r_value)
-        _set_if_nonzero(row[14], o_value)
+        effective_salary = basic_salary if basic_salary >= min_wage else min_wage
+    else:
+        effective_salary = min_wage
+
+    base_rate = round(effective_salary / 21.75 / 8, 2)
+    p_value = round(base_rate * 1.5 * floored_pay_work)
+    q_value = round(base_rate * 2 * floored_pay_rest)
+    r_value = round(base_rate * 3 * floored_pay_holiday)
+    o_value = round(p_value + q_value + r_value)
+    _set_if_nonzero(row[15], p_value)
+    _set_if_nonzero(row[16], q_value)
+    _set_if_nonzero(row[17], r_value)
+    _set_if_nonzero(row[14], o_value)
 
 
 def write_dict_overtime_to_excel(
@@ -1021,7 +1031,16 @@ def calculate_night_truncation(night_ids: list, dict_used_overtime_night: dict,
             )
         else:
             total_hours = sum(x[1] for x in entries)
-        work_hours = sum([1 for x in weekday if weekday[x] == 1.5]) * 8
+        # 计算当月工作日总小时（工作日按 8 小时计）
+        work_hours = sum(1 for x in weekday if weekday[x] == 1.5) * 8
+        # 对夜班人员按工号从 config 中读取年假天数并从 work_hours 中扣减（d * 8）
+        try:
+            vac_days = int(config.NIGHT_EMPLOYEE_VACATION_DAYS.get(emp_id, 0))
+            if vac_days > 0:
+                work_hours = max(0, work_hours - vac_days * 15)
+        except Exception:
+            # 配置异常则忽略扣减，保留原始 work_hours
+            pass
 
         if total_hours > work_hours:
             overtime = total_hours - work_hours
