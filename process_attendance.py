@@ -1,5 +1,6 @@
 from openpyxl import load_workbook
 from demos import Crili
+import config
 import datetime
 import calendar
 import logging
@@ -77,7 +78,7 @@ def load_workbook_safe(filename: str):
         raise
 
 
-crili = Crili(2026, datetime.datetime.now().month - 1)
+crili = Crili(config.YEAR, config.MONTH)
 weekday = crili.parseHTML()
 
 

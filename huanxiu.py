@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from openpyxl import load_workbook
 from demos import Crili
+import config
 
 
 class App:
@@ -47,13 +48,11 @@ class App:
         self.entry_name.grid(row=0, column=3, sticky=tk.EW,
                              pady=row_h, padx=(6, 0))
 
-        # 年月输入框（默认显示为上个月，格式 YYYY-MM）
+        # 年月输入框（默认显示全局配置的年月，格式 YYYY-MM，用户仍可在界面手动修改）
         ttk.Label(main_frame, text="年月：").grid(
             row=1, column=0, sticky=tk.E, pady=row_h)
         self.month_var = tk.StringVar()
-        now = datetime.datetime.now()
-        last_month = (now.replace(day=1) - datetime.timedelta(days=1))
-        default_ym = f"{last_month.year}-{last_month.month:02d}"
+        default_ym = f"{config.YEAR}-{config.MONTH:02d}"
         self.month_var.set(default_ym)
         self.entry_month = ttk.Entry(main_frame, textvariable=self.month_var)
         self.entry_month.grid(
@@ -175,7 +174,8 @@ class App:
                 return None
 
             rows = list(ws.iter_rows(min_row=2))
-            overtime_rows = []
+            # 先收集所有加班记录（包含日期、倍率、总加班时长）
+            all_overtime_records = []
             for row in rows:
                 rid = row[1].value
                 if rid is None:
@@ -194,9 +194,48 @@ class App:
                     overtime_hours = float(overtime_hours)
                 except Exception:
                     overtime_hours = 0
-                if overtime_hours <= 0:
+                if overtime_hours > 0:
+                    all_overtime_records.append((multiplier, row, day, overtime_hours))
+            
+            if not all_overtime_records:
+                messagebox.showwarning("警告", "该人员当月无加班记录。")
+                return
+            
+            # 按日期分组，计算每组的总加班时长和已抵扣串休
+            from collections import defaultdict
+            day_data = defaultdict(lambda: {"total_hours": 0, "deducted": 0, "multiplier": 1.5, "row": None})
+            for multiplier, row, day, overtime_hours in all_overtime_records:
+                day_key = day.strftime("%Y%m%d")
+                day_data[day_key]["total_hours"] += overtime_hours
+                day_data[day_key]["multiplier"] = max(multiplier, day_data[day_key]["multiplier"])
+                day_data[day_key]["row"] = row
+            
+            # 计算每组的已抵扣串休
+            for day_key, data in day_data.items():
+                row = data["row"]
+                k_value = row[10].value or 0
+                try:
+                    k_value = float(k_value)
+                except:
+                    k_value = 0
+                data["deducted"] = k_value  # k_value 是负数
+            
+            # 构建用于抵扣的列表
+            overtime_rows = []
+            for day_key, data in day_data.items():
+                # 剩余可用加班时长 = 总加班时长 - |已抵扣串休|
+                remaining = data["total_hours"] - (-data["deducted"])
+                if remaining <= 0:
                     continue
-                overtime_rows.append((multiplier, row, overtime_hours))
+                overtime_rows.append((data["multiplier"], data["row"], remaining))
+
+            # 计算剩余可用加班时长
+            total_overtime = sum(item[2] for item in overtime_rows)
+            remaining_overtime = total_overtime
+
+            if remaining_overtime <= 0:
+                messagebox.showwarning("警告", "该人员当月加班时长已全部抵扣完毕。")
+                return
 
             # 按工作日、公休日、节假日顺序抵扣
             overtime_rows.sort(key=lambda item: (
@@ -207,21 +246,35 @@ class App:
                 if remain_hours <= 0:
                     break
                 used = min(avail, remain_hours)
-                row[10].value = -used
+                # 累加 K 列已有的抵扣值，而不是覆盖
+                existing_k = row[10].value or 0
+                row[10].value = existing_k - used
                 remain_hours -= used
                 used_total += used
 
             if remain_hours > 0:
                 wb.close()
                 messagebox.showerror(
-                    "错误", f"加班时长不足，仍需抵扣 {remain_hours:.2f} 小时。")
+                    "错误", f"加班时长不足，剩余可用 {remaining_overtime:.2f} 小时，"
+                           f"仍需抵扣 {remain_hours:.2f} 小时。")
                 return
+
+            # 计算累计抵扣值（按日期分组后计算，避免重复）
+            total_deducted_after = 0.0
+            for day_key, data in day_data.items():
+                row = data["row"]
+                k_value = row[10].value or 0
+                try:
+                    k_value = float(k_value)
+                    total_deducted_after += k_value
+                except:
+                    pass
 
             wb.save(excel_path)
             wb.close()
-            self.entry_hours.delete(0, tk.END)
+            self.entry_hours.delete(0, tk.END)  # 运行后清空输入框
             messagebox.showinfo(
-                "成功", f"已成功使用 {used_total:.2f} 小时加班时长抵扣串休。\n请检查统计表 K 列。")
+                "成功", f"本次抵扣 {used_total:.2f} 小时，累计已抵扣 {abs(total_deducted_after):.2f} 小时。\n请检查统计表 K 列。")
         except Exception as e:
             messagebox.showerror("错误", f"处理 Excel 失败：{e}")
             return

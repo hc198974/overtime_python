@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import calendar
 import datetime
+import config
 import tkinter
 import tkinter.simpledialog
 import requests
@@ -105,7 +106,8 @@ class Crili(object):
 
 class Cwindow(object):
     def __init__(self):
-        self.month = datetime.datetime.now().month - 1
+        self.year = config.YEAR
+        self.month = config.MONTH
         self.start_calculation = False
 
     def set_win_center(self, root, curWidth="", curHight=""):
@@ -144,13 +146,45 @@ class Cwindow(object):
         month = tkinter.simpledialog.askinteger(
             title="获取月份",
             prompt="请输入月份",
-            initialvalue=datetime.datetime.now().month - 1,
+            initialvalue=config.MONTH,
         )
         self.month = month
 
     def dealSheet(self):
-        # 对汇总表数据进行处理
-        Cmacro().dealData()
+        # 重置并生成统计表：A=姓名 B=职号 C=日报日期（从月初到最后一天）
+        from openpyxl import load_workbook
+
+        path = "计算结果.xlsx"
+        wb = load_workbook(path)
+
+        # 1. 从记录表提取 姓名 -> 职号（数据从第 3 行起，第1列姓名、第2列职号）
+        ws_jilu = wb["记录表"]
+        emp_list = []
+        for r in range(3, ws_jilu.max_row + 1):
+            name = ws_jilu.cell(row=r, column=1).value
+            emp_id = ws_jilu.cell(row=r, column=2).value
+            if name and emp_id:
+                emp_list.append((str(name).strip(), str(emp_id).strip()))
+
+        # 2. 清空统计表中除题头（第 1 行）以外的数据
+        ws_tongji = wb["统计表"]
+        if ws_tongji.max_row >= 2:
+            ws_tongji.delete_rows(2, ws_tongji.max_row - 1)
+
+        # 3. 按全局年月，为每个人生成从月初到最后一天的逐日记录（C 列日期格式 YYYY-MM-DD）
+        year, month = config.YEAR, config.MONTH
+        _, last_day = calendar.monthrange(year, month)
+        row = 2
+        for name, emp_id in emp_list:
+            for day in range(1, last_day + 1):
+                ws_tongji.cell(row=row, column=1, value=name)
+                ws_tongji.cell(row=row, column=2, value=emp_id)
+                ws_tongji.cell(row=row, column=3, value=f"{year}-{month:02d}-{day:02d}")
+                row += 1
+
+        wb.save(path)
+        logging.info("统计表已重置：%d 人 × %d 天（%d-%02d）共写入 %d 行。",
+                     len(emp_list), last_day, year, month, row - 2)
 
     def shutDown(self):
         self.start_calculation = True
@@ -183,31 +217,7 @@ class Cwindow(object):
         return self.start_calculation
 
 
-class Cmacro:
-    def __init__(self) -> None:
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        self.path = os.path.join(script_dir, r"原始数据.xlsm")
-
-    def dealData(self):
-        excel = win32com.client.Dispatch("Excel.Application")
-        excel.Visible = True
-        wb = excel.Workbooks.Open(self.path)
-        logging.info("开始处理Excel数据")
-        excel.Application.Run("deleteRow")
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        save_path = os.path.join(script_dir, "计算结果.xlsx")
-        wb.SaveAs(
-            save_path,
-            FileFormat=51,
-            ConflictResolution=2,
-        )
-        wb.Close()
-        logging.info("Excel数据处理完成")
-        excel.Quit()
-
 # 这是用来获得当月节假日（wage=3）的类，接口来自 timor.tech
-
-
 class Ccal:
     def __init__(self, year, month):
         self.year = year
