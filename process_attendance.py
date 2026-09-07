@@ -1037,7 +1037,7 @@ def calculate_night_truncation(night_ids: list, dict_used_overtime_night: dict,
         try:
             vac_days = int(config.NIGHT_EMPLOYEE_VACATION_DAYS.get(emp_id, 0))
             if vac_days > 0:
-                work_hours = max(0, work_hours - vac_days * 15)
+                work_hours = max(0, work_hours - vac_days * 8)
         except Exception:
             # 配置异常则忽略扣减，保留原始 work_hours
             pass
