@@ -3,9 +3,9 @@ LangChain 1.x 推荐写法（自包含版）：从 `计算结果.xlsx` 中提取
 
 特性：
 - 使用 `langchain-openai` 的 `ChatOpenAI` 作为推理后端（OpenAI 兼容接口）；
-- 支持两种后端，通过 --backend / 环境变量 LLM_BACKEND 切换，默认使用本地 llama.cpp：
-    * llama    ：本地 llama.cpp server（OpenAI 兼容，默认 http://localhost:8080/v1）
+- 支持两种后端，通过 --backend / 环境变量 LLM_BACKEND 切换，默认优先使用 DeepSeek，若不可用则回退到本地 llama.cpp：
     * deepseek ：远程 DeepSeek 服务（默认 https://api.deepseek.com/v1）
+    * llama    ：本地 llama.cpp server（OpenAI 兼容，默认 http://localhost:8080/v1）
 - 使用 `langchain.agents.create_agent` 构建标准 ReAct Agent，工具调用循环由框架托管，
   不再手写多轮 ToolMessage 往返，也不再需要自定义 BaseChatModel 子类。
 - 所有 Excel 读取逻辑与工具均内置，不依赖其它文件。
@@ -18,8 +18,8 @@ LangChain 1.x 推荐写法（自包含版）：从 `计算结果.xlsx` 中提取
 
 配置统一放在 .env（均可选）：
 
-  # 后端选择：llama（默认）或 deepseek
-  LLM_BACKEND=llama
+  # 后端选择：deepseek（默认，优先）或 llama（备用）
+  LLM_BACKEND=deepseek
 
   # 本地 llama.cpp 配置
   LLAMACPP_BASE_URL=http://localhost:8080/v1
@@ -63,7 +63,7 @@ def _load_dotenv(path: str = ".env") -> None:
 
 _load_dotenv()
 
-# --- 本地 llama.cpp 配置（默认后端） ---
+# --- 本地 llama.cpp 配置（备用后端） ---
 LLAMACPP_BASE_URL = os.environ.get("LLAMACPP_BASE_URL", "http://localhost:8080/v1")
 LLAMACPP_MODEL = os.environ.get("LLAMACPP_MODEL", "local-model")
 LLAMACPP_API_KEY = os.environ.get("LLAMACPP_API_KEY", "not-needed")
@@ -75,10 +75,10 @@ DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_TIMEOUT = int(os.environ.get("DEEPSEEK_TIMEOUT", "120"))
 
-# 默认后端：llama（本地）或 deepseek（远程）
-DEFAULT_BACKEND = os.environ.get("LLM_BACKEND", "llama").lower()
+# 默认后端：deepseek（远程）优先，llama（本地）作为备用
+DEFAULT_BACKEND = os.environ.get("LLM_BACKEND", "deepseek").lower()
 if DEFAULT_BACKEND not in ("llama", "deepseek"):
-    DEFAULT_BACKEND = "llama"
+    DEFAULT_BACKEND = "deepseek"
 
 EXCEL_PATH = "计算结果.xlsx"
 
@@ -349,7 +349,7 @@ def build_llm(
 ):
     """构建一个 1.x 标准的 ChatOpenAI 实例，指向指定后端的 OpenAI 兼容端点。
 
-    backend 可为 "llama"（默认，本地）或 "deepseek"（远程）；
+    backend 可为 "deepseek"（默认，远程）或 "llama"（备用，本地）；
     任一连接参数若未显式传入，则回退到对应后端的默认配置。
     """
     if backend not in ("llama", "deepseek"):
@@ -386,6 +386,8 @@ def run_agent(
 ) -> str:
     """运行 ReAct Agent 回答提问，返回最终中文总结文本。
 
+    默认优先使用 deepseek；若该后端调用失败且调用方未显式指定后端，则自动回退到 llama。
+
     关键点（1.x 推荐）：
       1. bind 工具交给框架：create_agent(model, tools, system_prompt=...) 内部已调用 model.bind_tools(tools)；
       2. 工具调用循环由 langchain.agents 托管，无需手写 _generate + ToolMessage 多轮；
@@ -393,19 +395,32 @@ def run_agent(
     """
     from langchain.agents import create_agent
 
-    llm = build_llm(backend, model, base_url, api_key, timeout, temperature, max_tokens)
-    agent = create_agent(llm, TOOLS, system_prompt=SYSTEM_PROMPT)
+    backends = [backend] if backend in ("llama", "deepseek") else [DEFAULT_BACKEND]
+    if backend == DEFAULT_BACKEND and backend == "deepseek":
+        backends = ["deepseek", "llama"]
 
-    result = agent.invoke({"messages": [HumanMessage(content=question)]})
+    last_error = None
+    for candidate in backends:
+        try:
+            llm = build_llm(candidate, model, base_url, api_key, timeout, temperature, max_tokens)
+            agent = create_agent(llm, TOOLS, system_prompt=SYSTEM_PROMPT)
 
-    messages = result.get("messages", [])
-    # 取最后一条带正文的消息作为最终答案（兜底处理）
-    answer = ""
-    for m in reversed(messages):
-        if getattr(m, "content", None):
-            answer = m.content
-            break
-    return answer
+            result = agent.invoke({"messages": [HumanMessage(content=question)]})
+
+            messages = result.get("messages", [])
+            # 取最后一条带正文的消息作为最终答案（兜底处理）
+            answer = ""
+            for m in reversed(messages):
+                if getattr(m, "content", None):
+                    answer = m.content
+                    break
+            return answer
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            if candidate == backends[-1]:
+                raise
+
+    raise last_error
 
 
 def summarize_employee(
@@ -438,7 +453,7 @@ def main():
     parser.add_argument("--question", help="自由提问（与 --id 二选一）")
     parser.add_argument("--backend", default=DEFAULT_BACKEND,
                         choices=["llama", "deepseek"],
-                        help="推理后端：llama（本地，默认）或 deepseek（远程）")
+                        help="推理后端：deepseek（远程，默认）或 llama（本地，备用）")
     parser.add_argument("--model", default=None, help="模型名（覆盖后端默认值）")
     parser.add_argument("--base-url", default=None, help="OpenAI 兼容接口地址（覆盖后端默认值）")
     parser.add_argument("--api-key", default=None, help="API Key（覆盖后端默认值）")

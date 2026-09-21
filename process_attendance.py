@@ -78,7 +78,7 @@ def load_workbook_safe(filename: str):
         raise
 
 
-crili = Crili(2026, datetime.datetime.now().month - 1)
+crili = Crili(config.YEAR, config.MONTH)
 weekday = crili.parseHTML()
 
 
@@ -301,33 +301,35 @@ def calculate_dict_overtime(dict_in_out: dict, emp_id: str, d: str) -> list:
                 dict_overtime_sec += overlap(in_time, out_time, lo, hi)
             in_time = None
 
-     # 支持特殊工号的自定义算法（曲书成在这两天是白班模式）
-    if emp_id == "Q6007":
-        if d in ["20260801", "20260808"]:
+    # ---------------------------------------------------
+    # 支持特殊工号的自定义算法（曲书成在这两天是白班模式）
+    if emp_id in ["QB33"]:
+        if d in ["20260903", "20260904", "20260905", "20260906", "20260907", "20260908", "20260909", "20260910", "20260911", "20260912", "20260913", "20260914", "20260915", "20260916"]:
             try:
-                dict_overtime_sec=0
-                intervals = [(T0, T12), (T13, T24)]
-                for t, direction in records:                    
-                    ts = to_sec(t)
-                    if direction == "in":
-                        in_time = ts
-                    elif direction == "out" and in_time is not None:
-                        out_time = ts
-                        
-                        for lo, hi in intervals:
-                            dict_overtime_sec += overlap(in_time, out_time, lo, hi)
-                        in_time = None
-                        
+                dict_overtime_sec = 0
             except Exception as e:
                 logging.warning(f"special overtime standard failed for {emp_id} {d}: {e}, fallback to default")
+    
+    if emp_id in ["Q6410"]:
+        if d in ["20260902","20260903", "20260904", "20260905", "20260906", "20260907", "20260908", "20260909", "20260910", "20260911", "20260912", "20260913", "20260914", "20260915", "20260916"]:
+            try:
+                dict_overtime_sec = 0
+            except Exception as e:
+                logging.warning(f"special overtime standard failed for {emp_id} {d}: {e}, fallback to default")
+    
+    if emp_id in ["Q2527"]:
+            if d in ["20260901","20260902","20260903", "20260904", "20260905", "20260906", "20260907", "20260908", "20260909", "20260910", "20260911", "20260912", "20260913", "20260914", "20260915", "20260916"]:
+                try:
+                    dict_overtime_sec = 0
+                except Exception as e:
+                    logging.warning(f"special overtime standard failed for {emp_id} {d}: {e}, fallback to default")
+    #-----------------------------------------------------
     
     if adjust and dict_overtime_sec > 0:
         if wd == 1.5:
             dict_overtime_sec += 1800
         elif wd in (2, 3):
-            dict_overtime_sec -= 1800
-
-     
+            dict_overtime_sec -= 1800     
    
     return [round(max(0, dict_overtime_sec / 3600), 2), night_type]
 
@@ -1032,7 +1034,9 @@ def calculate_night_truncation(night_ids: list, dict_used_overtime_night: dict,
         else:
             total_hours = sum(x[1] for x in entries)
         # 计算当月工作日总小时（工作日按 8 小时计）
-        work_hours = sum(1 for x in weekday if weekday[x] == 1.5) * 8
+        # work_hours = sum(1 for x in weekday if weekday[x] == 1.5) * 8
+        #9月特殊情况，先统计到9月20日
+        work_hours=15*8
         # 对夜班人员按工号从 config 中读取年假天数并从 work_hours 中扣减（d * 8）
         try:
             vac_days = int(config.NIGHT_EMPLOYEE_VACATION_DAYS.get(emp_id, 0))
