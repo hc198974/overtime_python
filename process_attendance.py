@@ -303,26 +303,14 @@ def calculate_dict_overtime(dict_in_out: dict, emp_id: str, d: str) -> list:
 
     # ---------------------------------------------------
     # 支持特殊工号的自定义算法（曲书成在这两天是白班模式）
-    if emp_id in ["QB33"]:
-        if d in ["20260903", "20260904", "20260905", "20260906", "20260907", "20260908", "20260909", "20260910", "20260911", "20260912", "20260913", "20260914", "20260915", "20260916"]:
-            try:
-                dict_overtime_sec = 0
-            except Exception as e:
-                logging.warning(f"special overtime standard failed for {emp_id} {d}: {e}, fallback to default")
+    # if emp_id in ["QB33"]:
+    #     if d in ["20260903", "20260904", "20260907", "20260908", "20260909", "20260910", "20260911", "20260914", "20260915", "20260916"]:
+    #         try:
+    #             dict_overtime_sec = 0
+    #         except Exception as e:
+    #             logging.warning(f"special overtime standard failed for {emp_id} {d}: {e}, fallback to default")
     
-    if emp_id in ["Q6410"]:
-        if d in ["20260902","20260903", "20260904", "20260905", "20260906", "20260907", "20260908", "20260909", "20260910", "20260911", "20260912", "20260913", "20260914", "20260915", "20260916"]:
-            try:
-                dict_overtime_sec = 0
-            except Exception as e:
-                logging.warning(f"special overtime standard failed for {emp_id} {d}: {e}, fallback to default")
-    
-    if emp_id in ["Q2527"]:
-            if d in ["20260901","20260902","20260903", "20260904", "20260905", "20260906", "20260907", "20260908", "20260909", "20260910", "20260911", "20260912", "20260913", "20260914", "20260915", "20260916"]:
-                try:
-                    dict_overtime_sec = 0
-                except Exception as e:
-                    logging.warning(f"special overtime standard failed for {emp_id} {d}: {e}, fallback to default")
+ 
     #-----------------------------------------------------
     
     if adjust and dict_overtime_sec > 0:
